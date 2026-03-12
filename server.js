@@ -46,29 +46,38 @@ function getLocalIP() {
 }
 
 function getClientIP(req) {
-  return (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  // X-Forwarded-For lo envían Railway y otros proxies con el IP real del cliente
+  const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
+  const raw = forwarded || req.socket.remoteAddress || '';
+  return raw.replace(/^::ffff:/, '');
 }
 
 function isPrivateIP(ip) {
   if (ip.startsWith('192.168.')) return true;
   if (ip.startsWith('10.')) return true;
-
   if (ip.startsWith('172.')) {
     const part = parseInt(ip.split('.')[1]);
     return part >= 16 && part <= 31;
   }
-
   return false;
 }
 
 function clientSubnet(req) {
   const ip = getClientIP(req);
 
+  // Mismo equipo que el servidor
   if (ip === '127.0.0.1' || ip === '::1') {
     return getLocalIP().split('.').slice(0, 3).join('.');
   }
 
-  return ip.split('.').slice(0, 3).join('.');
+  if (isPrivateIP(ip)) {
+    // Red local: agrupar por subred /24 (192.168.1.x → "192.168.1")
+    return ip.split('.').slice(0, 3).join('.');
+  }
+
+  // IP pública (Railway u otro deploy): agrupar por IP completo.
+  // Todos los dispositivos del mismo router comparten el mismo IP público.
+  return ip;
 }
 
 function getRoom(subnet) {
@@ -87,20 +96,6 @@ function getRoomClips(subnet) {
 }
 
 app.use(express.json());
-
-/* BLOQUEO DE CONEXIONES EXTERNAS — va primero, antes de servir cualquier archivo */
-app.use((req, res, next) => {
-  const ip = getClientIP(req);
-
-  if (ip === '127.0.0.1' || ip === '::1') return next();
-
-  if (!isPrivateIP(ip)) {
-    return res.status(403).send('Acceso permitido solo desde red local WiFi.');
-  }
-
-  next();
-});
-
 app.use(express.static(path.join(__dirname, 'public')));
 
 /* LIMPIAR DISPOSITIVOS INACTIVOS */
