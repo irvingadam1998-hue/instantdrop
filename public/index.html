@@ -10,20 +10,20 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --bg: #0c0c0c;
+      --bg:      #0c0c0c;
       --surface: #141414;
-      --border: rgba(255,255,255,0.07);
-      --accent: #cbff47;
-      --text: #f0f0f0;
-      --muted: rgba(240,240,240,0.3);
-      --muted2: rgba(240,240,240,0.12);
+      --border:  rgba(255,255,255,0.07);
+      --accent:  #cbff47;
+      --text:    #f0f0f0;
+      --muted:   rgba(240,240,240,0.3);
+      --muted2:  rgba(240,240,240,0.12);
     }
 
     body {
       font-family: 'DM Sans', sans-serif;
       background: var(--bg);
       color: var(--text);
-      height: 100vh;
+      height: 100dvh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -53,6 +53,19 @@
       align-items: center;
       gap: 10px;
     }
+
+    .my-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 3px 9px 3px 5px;
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+    .my-badge .my-emoji { font-size: 1rem; line-height: 1; }
 
     .ip-badge {
       font-family: 'DM Mono', monospace;
@@ -90,10 +103,11 @@
       align-items: center;
       justify-content: center;
       position: relative;
-      gap: 32px;
+      gap: 24px;
+      overflow: hidden;
     }
 
-    /* drop diamond */
+    /* ── Drop diamond ── */
     .drop-wrap {
       position: relative;
       width: 260px; height: 260px;
@@ -101,9 +115,9 @@
     }
 
     /* ── Animations ── */
-    @keyframes spin-slow   { to { transform: rotate(calc(45deg + 360deg)); } }
-    @keyframes spin-rev    { to { transform: rotate(calc(45deg - 360deg)); } }
-    @keyframes pulse-ring  {
+    @keyframes spin-slow  { to { transform: rotate(calc(45deg + 360deg)); } }
+    @keyframes spin-rev   { to { transform: rotate(calc(45deg - 360deg)); } }
+    @keyframes pulse-ring {
       0%   { opacity: 0.06; transform: rotate(45deg) scale(1); }
       50%  { opacity: 0.14; transform: rotate(45deg) scale(1.04); }
       100% { opacity: 0.06; transform: rotate(45deg) scale(1); }
@@ -118,13 +132,12 @@
     }
     @keyframes icon-breathe {
       0%, 100% { box-shadow: 0 0 0 0 rgba(203,255,71,0); }
-      50%       { box-shadow: 0 0 0 8px rgba(203,255,71,0.06); }
+      50%      { box-shadow: 0 0 0 8px rgba(203,255,71,0.06); }
     }
-    @keyframes scan-line {
-      0%   { transform: rotate(45deg) scaleY(0); opacity: 0; }
-      10%  { opacity: 1; }
-      50%  { transform: rotate(45deg) scaleY(1); opacity: 0.5; }
-      100% { transform: rotate(405deg) scaleY(0); opacity: 0; }
+    @keyframes sweep {
+      0%   { transform: rotate(-40deg); opacity: 0; }
+      5%   { opacity: 1; }
+      100% { transform: rotate(320deg); opacity: 0; }
     }
 
     .diamond {
@@ -143,7 +156,6 @@
       animation: pulse-ring 3.5s ease-in-out infinite, spin-slow 28s linear infinite;
     }
 
-    /* scanning dot */
     .orbit-dot {
       position: absolute;
       width: 5px; height: 5px;
@@ -162,7 +174,6 @@
       z-index: 4;
     }
 
-    /* scan sweep */
     .scan-sweep {
       position: absolute;
       width: 130px; height: 2px;
@@ -171,18 +182,8 @@
       transform-origin: left center;
       background: linear-gradient(90deg, transparent, rgba(203,255,71,0.25));
       border-radius: 0 2px 2px 0;
-      animation: none;
-      opacity: 0;
-      z-index: 3;
-    }
-    /* idle sweep loops */
-    .scan-sweep {
       animation: sweep 4s ease-in-out infinite;
-    }
-    @keyframes sweep {
-      0%   { transform: rotate(-40deg); opacity: 0; }
-      5%   { opacity: 1; }
-      100% { transform: rotate(320deg); opacity: 0; }
+      z-index: 3;
     }
 
     #drop-zone {
@@ -192,14 +193,8 @@
       z-index: 5;
       border-radius: 50%;
     }
-    #drop-zone.drag-over ~ .diamond {
-      border-color: var(--accent);
-      animation: spin-rev 4s linear infinite;
-    }
-    #drop-zone.drag-over ~ .diamond-outer {
-      border-color: rgba(203,255,71,0.4);
-      animation: spin-slow 6s linear infinite;
-    }
+    #drop-zone.drag-over ~ .diamond       { border-color: var(--accent); animation: spin-rev 4s linear infinite; }
+    #drop-zone.drag-over ~ .diamond-outer { border-color: rgba(203,255,71,0.4); animation: spin-slow 6s linear infinite; }
 
     /* center icon */
     .center-icon {
@@ -211,7 +206,6 @@
       gap: 8px;
       pointer-events: none;
     }
-
     .icon-box {
       width: 52px; height: 52px;
       border-radius: 14px;
@@ -222,7 +216,6 @@
       animation: icon-breathe 3s ease-in-out infinite;
       transition: transform 0.2s;
     }
-
     .icon-label {
       font-family: 'DM Mono', monospace;
       font-size: 0.68rem;
@@ -238,24 +231,82 @@
       z-index: 3;
       opacity: 0;
       filter: grayscale(0.3);
-      transition: none;
       transform-origin: center;
     }
 
-    /* bottom hint */
+    /* ── Devices row ── */
+    .devices-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .devices-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.63rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    .devices-row {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .device-bubble {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .device-ring {
+      width: 54px; height: 54px;
+      border-radius: 50%;
+      border: 1.5px solid var(--border);
+      background: var(--surface);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem;
+      transition: border-color 0.2s, background 0.2s, box-shadow 0.2s, transform 0.15s;
+      pointer-events: none;
+    }
+    .device-bubble:hover .device-ring {
+      border-color: rgba(203,255,71,0.5);
+      transform: scale(1.06);
+    }
+    .device-bubble.selected .device-ring {
+      border-color: var(--accent);
+      background: rgba(203,255,71,0.08);
+      box-shadow: 0 0 0 3px rgba(203,255,71,0.15);
+    }
+    .device-bubble.drag-over .device-ring {
+      border-color: var(--accent);
+      background: rgba(203,255,71,0.12);
+      box-shadow: 0 0 16px rgba(203,255,71,0.25);
+      transform: scale(1.1);
+    }
+    .device-tag {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.58rem;
+      color: var(--muted);
+    }
+    .device-bubble.selected .device-tag { color: var(--accent); }
+
+    /* ── Hint + add button ── */
     .hint-block {
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
     }
-
     .hint-text {
       font-size: 0.82rem;
       color: var(--muted);
-      font-weight: 400;
     }
-
     .add-btn {
       width: 42px; height: 42px;
       border-radius: 50%;
@@ -269,13 +320,14 @@
       transition: transform 0.15s, opacity 0.15s;
       line-height: 1;
     }
-    .add-btn:hover { transform: scale(1.07); }
+    .add-btn:hover  { transform: scale(1.07); }
     .add-btn:active { transform: scale(0.95); }
+    .add-btn:disabled { opacity: 0.3; cursor: default; transform: none; }
 
     #file-input { display: none; }
 
-    /* files row */
-    .files-row {
+    /* ── Pills row (inbox + clips) ── */
+    .pills-row {
       display: flex;
       gap: 8px;
       max-width: 520px;
@@ -283,7 +335,7 @@
       padding: 4px 2px;
       scrollbar-width: none;
     }
-    .files-row::-webkit-scrollbar { display: none; }
+    .pills-row::-webkit-scrollbar { display: none; }
 
     .file-pill {
       flex-shrink: 0;
@@ -296,159 +348,27 @@
       padding: 8px 12px;
       cursor: pointer;
       transition: border-color 0.15s, background 0.15s;
-      max-width: 180px;
+      max-width: 190px;
     }
     .file-pill:hover { border-color: var(--accent); background: rgba(203,255,71,0.04); }
 
-    .pill-icon { font-size: 1rem; flex-shrink: 0; }
+    .pill-from { font-size: 1.1rem; flex-shrink: 0; }
     .pill-info { min-width: 0; }
     .pill-name {
       font-size: 0.75rem; font-weight: 500;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      max-width: 110px;
     }
     .pill-size { font-size: 0.65rem; color: var(--muted); font-family: 'DM Mono', monospace; }
-
     .pill-del {
-      margin-left: 4px;
-      flex-shrink: 0;
+      margin-left: 4px; flex-shrink: 0;
       background: none; border: none;
-      color: var(--muted);
-      font-size: 0.7rem;
-      cursor: pointer;
-      padding: 2px;
-      border-radius: 4px;
-      transition: color 0.15s;
+      color: var(--muted); font-size: 0.7rem;
+      cursor: pointer; padding: 2px;
+      border-radius: 4px; transition: color 0.15s;
     }
     .pill-del:hover { color: #ff5f5f; }
 
-    /* ── Footer ── */
-    footer {
-      padding: 12px 24px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .footer-left {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .stat-chip {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.65rem;
-      color: var(--muted);
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 5px;
-      padding: 3px 8px;
-    }
-    .stat-chip b { color: var(--accent); font-weight: 500; }
-
-    .version {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.62rem;
-      color: rgba(255,255,255,0.13);
-    }
-
-    /* ── Upload overlay ── */
-    #upload-overlay {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.75);
-      backdrop-filter: blur(10px);
-      z-index: 100;
-      align-items: center; justify-content: center;
-    }
-    #upload-overlay.open { display: flex; }
-
-    .upload-box {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 16px;
-    }
-
-    .upload-ring {
-      width: 80px; height: 80px;
-      border-radius: 50%;
-      border: 2px solid var(--border);
-      border-top-color: var(--accent);
-      animation: spin 0.9s linear infinite;
-      display: flex; align-items: center; justify-content: center;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .upload-pct {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.82rem;
-      color: var(--accent);
-      position: absolute;
-    }
-
-    .upload-label { font-size: 0.8rem; color: var(--muted); }
-
-    /* ── QR panel ── */
-    #qr-panel {
-      display: none;
-      position: fixed; inset: 0;
-      background: rgba(0,0,0,0.8);
-      backdrop-filter: blur(10px);
-      z-index: 100;
-      align-items: center; justify-content: center;
-    }
-    #qr-panel.open { display: flex; }
-
-    .qr-box {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 28px;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 14px;
-      min-width: 260px;
-    }
-
-    .qr-box img {
-      width: 170px; height: 170px;
-      border-radius: 10px;
-      background: #fff;
-      padding: 8px;
-    }
-
-    .qr-url {
-      font-family: 'DM Mono', monospace;
-      font-size: 0.75rem;
-      color: var(--accent);
-      background: rgba(203,255,71,0.06);
-      border: 1px solid rgba(203,255,71,0.15);
-      border-radius: 8px;
-      padding: 7px 14px;
-      text-align: center;
-      width: 100%;
-    }
-    .qr-url a { color: inherit; text-decoration: none; }
-
-    .qr-hint { font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.5; }
-
-    .btn-close {
-      width: 100%;
-      padding: 8px;
-      border-radius: 8px;
-      border: 1px solid var(--border);
-      background: transparent;
-      color: var(--muted);
-      font-size: 0.8rem;
-      cursor: pointer;
-      font-family: 'DM Sans', sans-serif;
-      transition: all 0.15s;
-    }
-    .btn-close:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
-
-    /* ── Text clip pills ── */
     .clip-pill {
       flex-shrink: 0;
       display: flex;
@@ -463,47 +383,104 @@
       max-width: 200px;
     }
     .clip-pill:hover { border-color: rgba(203,255,71,0.5); background: rgba(203,255,71,0.09); }
-
     .clip-icon { font-size: 0.75rem; flex-shrink: 0; margin-top: 1px; opacity: 0.6; }
     .clip-text {
-      font-size: 0.73rem;
-      color: var(--text);
-      line-height: 1.4;
+      font-size: 0.73rem; color: var(--text); line-height: 1.4;
       overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      flex: 1;
-      min-width: 0;
-      word-break: break-all;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      flex: 1; min-width: 0; word-break: break-all;
     }
     .clip-del {
-      background: none; border: none;
-      color: var(--muted); font-size: 0.65rem;
-      cursor: pointer; padding: 1px 3px;
-      border-radius: 3px; flex-shrink: 0;
+      background: none; border: none; color: var(--muted); font-size: 0.65rem;
+      cursor: pointer; padding: 1px 3px; border-radius: 3px; flex-shrink: 0;
       transition: color 0.15s;
     }
     .clip-del:hover { color: #ff5f5f; }
 
-    /* ── Toast ── */
-    #toast {
-      position: fixed;
-      bottom: 20px; left: 50%;
-      transform: translateX(-50%) translateY(50px);
-      opacity: 0;
+    /* ── Footer ── */
+    footer {
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .footer-left { display: flex; align-items: center; gap: 6px; }
+    .stat-chip {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 99px;
-      padding: 8px 18px;
-      font-size: 0.78rem;
-      color: var(--text);
-      transition: all 0.25s;
-      z-index: 200;
-      white-space: nowrap;
+      border-radius: 5px;
+      padding: 3px 8px;
+    }
+    .stat-chip b { color: var(--accent); font-weight: 500; }
+    .version { font-family: 'DM Mono', monospace; font-size: 0.62rem; color: rgba(255,255,255,0.13); }
+
+    /* ── Upload overlay ── */
+    #upload-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #upload-overlay.open { display: flex; }
+    .upload-box { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .upload-ring {
+      width: 80px; height: 80px; border-radius: 50%;
+      border: 2px solid var(--border); border-top-color: var(--accent);
+      animation: spin 0.9s linear infinite;
+      display: flex; align-items: center; justify-content: center;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .upload-pct { font-family: 'DM Mono', monospace; font-size: 0.82rem; color: var(--accent); position: absolute; }
+    .upload-label { font-size: 0.8rem; color: var(--muted); }
+
+    /* ── QR panel ── */
+    #qr-panel {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
+      z-index: 100; align-items: center; justify-content: center;
+    }
+    #qr-panel.open { display: flex; }
+    .qr-box {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 28px;
+      display: flex; flex-direction: column; align-items: center; gap: 14px; min-width: 260px;
+    }
+    .qr-box img { width: 170px; height: 170px; border-radius: 10px; background: #fff; padding: 8px; }
+    .qr-url {
+      font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--accent);
+      background: rgba(203,255,71,0.06); border: 1px solid rgba(203,255,71,0.15);
+      border-radius: 8px; padding: 7px 14px; text-align: center; width: 100%;
+    }
+    .qr-url a { color: inherit; text-decoration: none; }
+    .qr-hint { font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.5; }
+    .btn-close {
+      width: 100%; padding: 8px; border-radius: 8px;
+      border: 1px solid var(--border); background: transparent;
+      color: var(--muted); font-size: 0.8rem; cursor: pointer;
+      font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+    }
+    .btn-close:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed; bottom: 20px; left: 50%;
+      transform: translateX(-50%) translateY(50px); opacity: 0;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 99px; padding: 8px 18px;
+      font-size: 0.78rem; color: var(--text);
+      transition: all 0.25s; z-index: 200; white-space: nowrap;
     }
     #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-    #toast::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: middle; }
+    #toast::before {
+      content: ''; display: inline-block; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--accent);
+      margin-right: 8px; vertical-align: middle;
+    }
   </style>
 </head>
 <body>
@@ -511,13 +488,18 @@
 <header>
   <div class="logo">wshare</div>
   <div class="header-right">
+    <div class="my-badge">
+      <span class="my-emoji" id="my-emoji">··</span>
+      <span style="font-family:'DM Mono',monospace;font-size:0.65rem;">yo</span>
+    </div>
     <div class="ip-badge" id="ip-badge" onclick="openQR()">···</div>
     <button class="ctrl-btn" onclick="openQR()" title="QR">⊞</button>
-    <button class="ctrl-btn accent" onclick="document.getElementById('file-input').click()" title="Subir">+</button>
+    <button class="ctrl-btn accent" id="add-btn-header" onclick="onAddClick()" title="Enviar">+</button>
   </div>
 </header>
 
 <main>
+  <!-- Drop zone diamond -->
   <div class="drop-wrap">
     <div id="drop-zone"></div>
     <div class="scan-sweep"></div>
@@ -526,25 +508,33 @@
     <div class="diamond diamond-outer"></div>
     <div class="diamond"></div>
     <div class="center-icon">
-      <div class="icon-box">↑</div>
-      <span class="icon-label" id="center-label">este dispositivo</span>
+      <div class="icon-box" id="center-icon-box">↑</div>
+      <span class="icon-label" id="center-label">elige un dispositivo</span>
     </div>
   </div>
 
-  <div class="hint-block">
-    <span class="hint-text">arrastra un archivo · <span style="color:var(--accent);opacity:0.7">ctrl+v</span> para texto</span>
-    <button class="add-btn" onclick="document.getElementById('file-input').click()">+</button>
+  <!-- Dispositivos en la red -->
+  <div class="devices-wrap" id="devices-wrap">
+    <div class="devices-label" id="devices-label">buscando…</div>
+    <div class="devices-row" id="devices-row"></div>
   </div>
 
-  <div class="files-row" id="files-row"></div>
+  <!-- Hint + botón agregar -->
+  <div class="hint-block">
+    <span class="hint-text">arrastra · <span style="color:var(--accent);opacity:0.7">ctrl+v</span> texto</span>
+    <button class="add-btn" id="add-btn" onclick="onAddClick()">+</button>
+  </div>
+
+  <!-- Pills: recibidos + clips -->
+  <div class="pills-row" id="pills-row"></div>
 </main>
 
 <footer>
   <div class="footer-left">
-    <div class="stat-chip"><b id="stat-count">0</b> archivos</div>
+    <div class="stat-chip"><b id="stat-count">0</b> recibidos</div>
     <div class="stat-chip">máx <b>50mb</b></div>
   </div>
-  <span class="version">v1.0.0</span>
+  <span class="version">v2.0.0</span>
 </footer>
 
 <input type="file" id="file-input" multiple>
@@ -556,7 +546,7 @@
       <div class="upload-ring"></div>
       <span class="upload-pct" id="upload-pct">0%</span>
     </div>
-    <span class="upload-label" id="upload-label">subiendo...</span>
+    <span class="upload-label" id="upload-label">enviando…</span>
   </div>
 </div>
 
@@ -564,8 +554,8 @@
 <div id="qr-panel" onclick="closeQR()">
   <div class="qr-box" onclick="event.stopPropagation()">
     <img id="qr-img" src="" alt="QR">
-    <div class="qr-url"><a id="qr-url" href="#" target="_blank">cargando...</a></div>
-    <p class="qr-hint">Abre esta URL en tu móvil.<br>Misma red WiFi requerida.</p>
+    <div class="qr-url"><a id="qr-url" href="#" target="_blank">cargando…</a></div>
+    <p class="qr-hint">Abre esta URL en otro dispositivo.<br>Misma red WiFi requerida.</p>
     <button class="btn-close" onclick="closeQR()">cerrar</button>
   </div>
 </div>
@@ -573,9 +563,37 @@
 <div id="toast"></div>
 
 <script>
-  let fileCache = [];
+  // ── Estado ──
+  let myDeviceId  = localStorage.getItem('wshare-deviceId');
+  let myEmoji     = localStorage.getItem('wshare-emoji') || '··';
+  let selectedId  = null;
+  let knownInbox  = new Set();
 
-  // QR
+  // ── Registro ──
+  async function register() {
+    const res = await fetch('/api/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: myDeviceId })
+    }).then(r => r.json());
+
+    myDeviceId = res.deviceId;
+    myEmoji    = res.emoji;
+    localStorage.setItem('wshare-deviceId', myDeviceId);
+    localStorage.setItem('wshare-emoji',    myEmoji);
+    document.getElementById('my-emoji').textContent = myEmoji;
+  }
+
+  // ── Heartbeat cada 10s ──
+  setInterval(() => {
+    fetch('/api/heartbeat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ deviceId: myDeviceId })
+    });
+  }, 10000);
+
+  // ── QR ──
   async function loadQR() {
     const { url, qr } = await fetch('/api/qr').then(r => r.json());
     document.getElementById('qr-img').src = qr;
@@ -584,129 +602,161 @@
     try {
       const ip = new URL(url).hostname;
       document.getElementById('ip-badge').textContent = ip;
-      document.getElementById('center-label').textContent = ip;
     } catch {}
   }
-
-  function openQR() { document.getElementById('qr-panel').classList.add('open'); }
+  function openQR()  { document.getElementById('qr-panel').classList.add('open'); }
   function closeQR() { document.getElementById('qr-panel').classList.remove('open'); }
 
-  // Files
-  async function loadFiles() {
-    fileCache = await fetch('/api/files').then(r => r.json());
-    renderFiles();
-    document.getElementById('stat-count').textContent = fileCache.length;
+  // ── Dispositivos ──
+  async function loadDevices() {
+    const devs = await fetch(`/api/devices?me=${myDeviceId}`).then(r => r.json());
+    renderDevices(devs);
   }
 
-  function renderFiles() {
-    const row = document.getElementById('files-row');
-    if (!fileCache.length) { row.innerHTML = ''; return; }
-    row.innerHTML = fileCache.map(f => `
-      <div class="file-pill" onclick="downloadFile('${esc(f.name)}')">
-        <span class="pill-icon">${fileIcon(f.name)}</span>
-        <div class="pill-info">
-          <div class="pill-name" title="${f.name}">${f.name}</div>
-          <div class="pill-size">${formatSize(f.size)}</div>
-        </div>
-        <button class="pill-del" onclick="event.stopPropagation();deleteFile('${esc(f.name)}')">✕</button>
+  function renderDevices(devs) {
+    const row   = document.getElementById('devices-row');
+    const label = document.getElementById('devices-label');
+
+    if (!devs.length) {
+      label.textContent = 'ningún otro dispositivo en tu red';
+      row.innerHTML = '';
+      return;
+    }
+
+    label.textContent = `${devs.length} dispositivo${devs.length > 1 ? 's' : ''} en tu red`;
+    row.innerHTML = devs.map(d => `
+      <div class="device-bubble ${selectedId === d.id ? 'selected' : ''}"
+           id="dev-${d.id}"
+           onclick="selectDevice('${d.id}','${d.emoji}')"
+           ondragover="onDragOver(event,'${d.id}')"
+           ondragleave="onDragLeave('${d.id}')"
+           ondrop="onDrop(event,'${d.id}')">
+        <div class="device-ring">${d.emoji}</div>
+        <span class="device-tag">${selectedId === d.id ? 'seleccionado' : 'enviar'}</span>
       </div>
     `).join('');
+
+    // Si el dispositivo seleccionado desapareció, limpiar selección
+    if (selectedId && !devs.find(d => d.id === selectedId)) {
+      selectedId = null;
+      updateCenterIcon();
+    }
   }
 
-  // Upload
-  function uploadFiles(files) {
-    if (!files.length) return;
-    const form = new FormData();
-    for (const f of files) form.append('files', f);
-
-    const overlay = document.getElementById('upload-overlay');
-    const pct = document.getElementById('upload-pct');
-    const label = document.getElementById('upload-label');
-
-    overlay.classList.add('open');
-    pct.textContent = '0%';
-    label.textContent = `subiendo ${files.length} archivo${files.length > 1 ? 's' : ''}...`;
-
-    const xhr = new XMLHttpRequest();
-    xhr.upload.addEventListener('progress', e => {
-      if (e.lengthComputable) {
-        const p = Math.round(e.loaded / e.total * 100);
-        pct.textContent = p + '%';
-      }
-    });
-    xhr.onload = () => {
-      overlay.classList.remove('open');
-      const res = JSON.parse(xhr.responseText);
-      if (res.error) { toast(res.error); return; }
-      loadAll();
-      toast(`${res.files.length} archivo${res.files.length > 1 ? 's' : ''} listo${res.files.length > 1 ? 's' : ''}`);
-    };
-    xhr.open('POST', '/api/upload');
-    xhr.send(form);
+  function selectDevice(id, emoji) {
+    selectedId = id;
+    updateCenterIcon(emoji);
+    // Re-render devices para mostrar selección
+    loadDevices();
+    // Abrir selector de archivos
+    document.getElementById('file-input').click();
   }
 
-  function downloadFile(name) {
-    const a = document.createElement('a');
-    a.href = `/api/download/${encodeURIComponent(name)}`;
-    a.download = name; a.click();
+  function updateCenterIcon(emoji) {
+    const box   = document.getElementById('center-icon-box');
+    const label = document.getElementById('center-label');
+    if (emoji) {
+      box.textContent   = emoji;
+      label.textContent = 'enviando a este';
+    } else {
+      box.textContent   = '↑';
+      label.textContent = 'elige un dispositivo';
+    }
   }
 
-  async function deleteFile(name) {
-    await fetch(`/api/files/${encodeURIComponent(name)}`, { method: 'DELETE' });
-    loadAll();
-    toast('eliminado');
+  // ── Botón + ──
+  function onAddClick() {
+    if (!selectedId) { toast('toca un dispositivo primero'); return; }
+    document.getElementById('file-input').click();
   }
 
-  // Drag & drop
+  // ── Drag sobre drop-zone central ──
   const zone = document.getElementById('drop-zone');
   zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
   zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
   zone.addEventListener('drop', e => {
     e.preventDefault();
     zone.classList.remove('drag-over');
-    uploadFiles([...e.dataTransfer.files]);
+    const files = [...e.dataTransfer.files];
+    if (!files.length) return;
+    if (!selectedId) { toast('toca un dispositivo primero'); return; }
+    sendFiles(files, selectedId);
   });
+  zone.addEventListener('click', () => onAddClick());
 
-  document.getElementById('file-input').addEventListener('change', e => {
-    uploadFiles([...e.target.files]);
-    e.target.value = '';
-  });
-
+  // Drag global
   document.addEventListener('dragover', e => e.preventDefault());
   document.addEventListener('drop', e => {
     e.preventDefault();
-    if (!zone.contains(e.target) && e.dataTransfer.files.length)
-      uploadFiles([...e.dataTransfer.files]);
+    if (zone.contains(e.target)) return;
+    const files = [...e.dataTransfer.files];
+    if (!files.length) return;
+    if (!selectedId) { toast('toca un dispositivo primero'); return; }
+    sendFiles(files, selectedId);
   });
 
-  // Utils
-  function esc(s) { return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
-
-  function formatSize(b) {
-    if (b < 1024) return b + 'b';
-    if (b < 1024 ** 2) return (b / 1024).toFixed(1) + 'kb';
-    return (b / 1024 ** 2).toFixed(1) + 'mb';
+  // ── Drag sobre dispositivo ──
+  function onDragOver(e, id) {
+    e.preventDefault();
+    document.getElementById('dev-' + id)?.classList.add('drag-over');
+  }
+  function onDragLeave(id) {
+    document.getElementById('dev-' + id)?.classList.remove('drag-over');
+  }
+  function onDrop(e, id) {
+    e.preventDefault();
+    e.stopPropagation();
+    onDragLeave(id);
+    const files = [...e.dataTransfer.files];
+    if (files.length) sendFiles(files, id);
   }
 
-  function fileIcon(name) {
-    const ext = name.split('.').pop().toLowerCase();
-    const m = { jpg:'🖼', jpeg:'🖼', png:'🖼', gif:'🖼', webp:'🖼', svg:'🖼',
-      mp4:'▶', mkv:'▶', avi:'▶', mov:'▶', mp3:'♪', wav:'♪', flac:'♪',
-      pdf:'📄', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊',
-      zip:'📦', rar:'📦', '7z':'📦', txt:'📃' };
-    return m[ext] || '◻';
+  // ── Enviar archivos ──
+  document.getElementById('file-input').addEventListener('change', e => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    if (!files.length || !selectedId) return;
+    sendFiles(files, selectedId);
+  });
+
+  async function sendFiles(files, targetId) {
+    const overlay = document.getElementById('upload-overlay');
+    const pct     = document.getElementById('upload-pct');
+    const lbl     = document.getElementById('upload-label');
+
+    overlay.classList.add('open');
+    pct.textContent = '0%';
+    lbl.textContent = `enviando ${files.length} archivo${files.length > 1 ? 's' : ''}…`;
+
+    const form = new FormData();
+    files.forEach(f => form.append('files', f));
+    form.append('fromId', myDeviceId);
+
+    return new Promise(resolve => {
+      const xhr = new XMLHttpRequest();
+      xhr.upload.addEventListener('progress', e => {
+        if (e.lengthComputable)
+          pct.textContent = Math.round(e.loaded / e.total * 100) + '%';
+      });
+      xhr.onload = () => {
+        overlay.classList.remove('open');
+        const res = JSON.parse(xhr.responseText);
+        if (res.error) { toast(res.error); return resolve(); }
+        toast('enviado ✓');
+        resolve();
+      };
+      xhr.open('POST', `/api/send/${targetId}`);
+      xhr.send(form);
+    });
   }
 
-  let tt;
-  function toast(msg) {
-    const el = document.getElementById('toast');
-    el.childNodes[el.childNodes.length - 1].textContent = msg;
-    el.classList.add('show');
-    clearTimeout(tt);
-    tt = setTimeout(() => el.classList.remove('show'), 2500);
+  // ── Inbox ──
+  async function loadInbox() {
+    const items = await fetch(`/api/inbox?deviceId=${myDeviceId}`).then(r => r.json());
+    return items;
   }
 
-  // ── Text clips — paste automático ──
+  // ── Clips ──
   document.addEventListener('paste', async e => {
     const text = (e.clipboardData || window.clipboardData).getData('text').trim();
     if (!text) return;
@@ -717,25 +767,40 @@
     }).then(r => r.json());
     if (res.error) { toast(res.error); return; }
     loadAll();
-    toast('texto compartido');
+    toast('texto compartido en la red');
   });
 
   async function loadClips() {
     return fetch('/api/clips').then(r => r.json());
   }
 
-  async function deleteClip(id) {
-    await fetch(`/api/clips/${id}`, { method: 'DELETE' });
-    loadAll();
+  // ── Render combinado ──
+  async function loadAll() {
+    const [inbox, clips] = await Promise.all([loadInbox(), loadClips()]);
+    renderAll(inbox, clips);
   }
 
-  function copyClip(text) {
-    navigator.clipboard.writeText(text).then(() => toast('copiado al portapapeles'));
-  }
-
-  function renderAll(files, clips) {
-    const row = document.getElementById('files-row');
+  function renderAll(inbox, clips) {
+    const row = document.getElementById('pills-row');
     const items = [];
+
+    // Detectar archivos nuevos
+    const newIds = inbox.map(f => f.id).filter(id => !knownInbox.has(id));
+    inbox.forEach(f => knownInbox.add(f.id));
+    if (newIds.length) toast(`📥 ${newIds.length} archivo${newIds.length > 1 ? 's' : ''} recibido${newIds.length > 1 ? 's' : ''}`);
+
+    inbox.forEach(f => {
+      items.push(`
+        <div class="file-pill" onclick="downloadInboxFile('${esc(f.id)}')">
+          <span class="pill-from">${f.fromEmoji}</span>
+          <div class="pill-info">
+            <div class="pill-name" title="${escHtml(f.name)}">${escHtml(f.name)}</div>
+            <div class="pill-size">${formatSize(f.size)}</div>
+          </div>
+          <button class="pill-del" onclick="event.stopPropagation();deleteInboxFile('${esc(f.id)}')">✕</button>
+        </div>
+      `);
+    });
 
     clips.forEach(c => {
       items.push(`
@@ -747,88 +812,98 @@
       `);
     });
 
-    files.forEach(f => {
-      items.push(`
-        <div class="file-pill" onclick="downloadFile('${esc(f.name)}')">
-          <span class="pill-icon">${fileIcon(f.name)}</span>
-          <div class="pill-info">
-            <div class="pill-name" title="${f.name}">${f.name}</div>
-            <div class="pill-size">${formatSize(f.size)}</div>
-          </div>
-          <button class="pill-del" onclick="event.stopPropagation();deleteFile('${esc(f.name)}')">✕</button>
-        </div>
-      `);
-    });
-
     row.innerHTML = items.join('');
-    document.getElementById('stat-count').textContent = files.length + clips.length;
+    document.getElementById('stat-count').textContent = inbox.length;
   }
 
-  async function loadAll() {
-    const [files, clips] = await Promise.all([
-      fetch('/api/files').then(r => r.json()),
-      fetch('/api/clips').then(r => r.json())
-    ]);
-    fileCache = files;
-    renderAll(files, clips);
+  function downloadInboxFile(id) {
+    const a = document.createElement('a');
+    a.href = `/api/inbox/${id}/download?deviceId=${myDeviceId}`;
+    a.click();
+  }
+  async function deleteInboxFile(id) {
+    await fetch(`/api/inbox/${id}?deviceId=${myDeviceId}`, { method: 'DELETE' });
+    knownInbox.delete(id);
+    loadAll();
+  }
+  function copyClip(text) {
+    navigator.clipboard.writeText(text).then(() => toast('copiado al portapapeles'));
+  }
+  async function deleteClip(id) {
+    await fetch(`/api/clips/${id}`, { method: 'DELETE' });
+    loadAll();
   }
 
+  // ── Utils ──
+  function esc(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
   function escHtml(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+  function formatSize(b) {
+    if (b < 1024) return b + 'b';
+    if (b < 1048576) return (b/1024).toFixed(1) + 'kb';
+    return (b/1048576).toFixed(1) + 'mb';
+  }
+  let _tt;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.childNodes[el.childNodes.length - 1].textContent = msg;
+    el.classList.add('show');
+    clearTimeout(_tt);
+    _tt = setTimeout(() => el.classList.remove('show'), 2500);
   }
 
-  // ── Floating file icons ──
+  // ── Floating file icons (animación original) ──
   const floatIcons = ['📄','🖼','🎵','📦','📝','📊','▶','📃','💻','🗂'];
   const wrap = document.querySelector('.drop-wrap');
-  const CX = 130, CY = 130; // center of wrap (260/2)
+  const CX = 130, CY = 130;
 
   function spawnFloatIcon() {
     const el = document.createElement('div');
     el.className = 'float-icon';
     el.textContent = floatIcons[Math.floor(Math.random() * floatIcons.length)];
 
-    // spawn on a random point of a circle around the area
-    const angle = Math.random() * Math.PI * 2;
+    const angle  = Math.random() * Math.PI * 2;
     const spawnR = 115 + Math.random() * 25;
     const startX = CX + Math.cos(angle) * spawnR;
     const startY = CY + Math.sin(angle) * spawnR;
-
-    // end slightly past center with a little offset
-    const endX = CX + (Math.random() - 0.5) * 18;
-    const endY = CY + (Math.random() - 0.5) * 18;
+    const endX   = CX + (Math.random() - 0.5) * 18;
+    const endY   = CY + (Math.random() - 0.5) * 18;
 
     el.style.left = startX + 'px';
     el.style.top  = startY + 'px';
-    el.style.transform = 'translate(-50%, -50%) scale(0.6)';
+    el.style.transform = 'translate(-50%,-50%) scale(0.6)';
     wrap.appendChild(el);
 
-    const dur = 2200 + Math.random() * 1400; // 2.2s – 3.6s
-
-    // keyframe animation via Web Animations API
+    const dur = 2200 + Math.random() * 1400;
     el.animate([
-      { opacity: 0,   transform: `translate(-50%,-50%) scale(0.5)`,
-        left: startX + 'px', top: startY + 'px' },
-      { opacity: 0.85, transform: `translate(-50%,-50%) scale(1)`,
-        left: startX + 'px', top: startY + 'px', offset: 0.15 },
-      { opacity: 0.7,  transform: `translate(-50%,-50%) scale(0.85)`,
-        left: (startX * 0.4 + endX * 0.6) + 'px',
-        top:  (startY * 0.4 + endY * 0.6) + 'px', offset: 0.75 },
-      { opacity: 0,    transform: `translate(-50%,-50%) scale(0.3)`,
-        left: endX + 'px', top: endY + 'px' }
+      { opacity: 0,    transform: 'translate(-50%,-50%) scale(0.5)', left: startX+'px', top: startY+'px' },
+      { opacity: 0.85, transform: 'translate(-50%,-50%) scale(1)',   left: startX+'px', top: startY+'px', offset: 0.15 },
+      { opacity: 0.7,  transform: 'translate(-50%,-50%) scale(0.85)',
+        left: (startX*0.4+endX*0.6)+'px', top: (startY*0.4+endY*0.6)+'px', offset: 0.75 },
+      { opacity: 0,    transform: 'translate(-50%,-50%) scale(0.3)', left: endX+'px', top: endY+'px' }
     ], { duration: dur, easing: 'ease-in', fill: 'forwards' })
       .finished.then(() => el.remove());
   }
 
-  // spawn 1 icon every ~700ms with some randomness
   function scheduleNext() {
     spawnFloatIcon();
     setTimeout(scheduleNext, 500 + Math.random() * 600);
   }
   setTimeout(scheduleNext, 800);
 
-  loadQR();
-  loadAll();
-  setInterval(loadAll, 5000);
+  // ── Polling ──
+  async function poll() {
+    await Promise.all([loadDevices(), loadAll()]);
+  }
+
+  // ── Init ──
+  (async () => {
+    await register();
+    await loadQR();
+    await poll();
+    setInterval(poll, 3000);
+  })();
 </script>
 </body>
 </html>
