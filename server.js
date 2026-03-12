@@ -16,33 +16,42 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-// Todas las subredes /24 de las interfaces locales activas
-function getLocalSubnets() {
-  const subnets = new Set();
-  for (const ifaces of Object.values(os.networkInterfaces()))
-    for (const i of ifaces)
-      if (i.family === 'IPv4' && !i.internal)
-        subnets.add(i.address.split('.').slice(0, 3).join('.'));
-  return subnets;
+// ── Detectar IP WiFi real (ignora adaptadores virtuales) ──
+function getWiFiIP() {
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return '0.0.0.0';
+
+  const ifaces = os.networkInterfaces();
+  const skip = /virtual|vmware|vbox|hyper|vethernet|loopback|bluetooth|tunnel|tap|tun/i;
+  const prefer = /wi.?fi|wlan|wireless/i;
+  let fallback = null;
+
+  for (const [name, addrs] of Object.entries(ifaces)) {
+    if (skip.test(name)) continue;
+    for (const addr of addrs) {
+      if (addr.family !== 'IPv4' || addr.internal) continue;
+      if (prefer.test(name)) return addr.address; // WiFi encontrado
+      if (!fallback) fallback = addr.address;
+    }
+  }
+  return fallback || '127.0.0.1';
 }
 
-function isLocalNetwork(rawIp) {
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) return true;
-
-  const ip = (rawIp || '').replace(/^::ffff:/, '');
-  if (ip === '127.0.0.1' || ip === '::1') return true;
-
-  const parts = ip.split('.');
-  if (parts.length !== 4) return false;
-
-  const clientSubnet = parts.slice(0, 3).join('.');
-  return getLocalSubnets().has(clientSubnet);
-}
-
-// Bloquear cualquier request que no venga de la misma red local
+// ── Restricción: el cliente debe estar en la misma subred /24
+//    que la interfaz de red que recibió la conexión ──
 app.use((req, res, next) => {
-  const clientIp = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
-  if (!isLocalNetwork(clientIp)) {
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return next();
+
+  const clean = ip => (ip || '').replace(/^::ffff:/, '');
+  const remote = clean(req.socket.remoteAddress); // IP del cliente
+  const local  = clean(req.socket.localAddress);  // IP del adaptador que recibió la conexión
+
+  // Permitir loopback
+  if (remote === '127.0.0.1' || remote === '::1') return next();
+
+  const remoteSubnet = remote.split('.').slice(0, 3).join('.');
+  const localSubnet  = local.split('.').slice(0, 3).join('.');
+
+  if (remoteSubnet !== localSubnet) {
     return res.status(403).send('Acceso solo desde la red WiFi local.');
   }
   next();
@@ -99,7 +108,6 @@ app.get('/api/clips', (req, res) => {
   res.json([...clips.values()].map(({ id, text, mtime }) => ({ id, text, mtime })));
 });
 
-
 app.post('/api/clips', (req, res) => {
   const text = (req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Texto vacío' });
@@ -117,26 +125,18 @@ app.delete('/api/clips/:id', (req, res) => {
 
 // QR
 app.get('/api/qr', async (req, res) => {
-  const host = process.env.RAILWAY_PUBLIC_DOMAIN || `${getLocalIP()}:${PORT}`;
+  const host = process.env.RAILWAY_PUBLIC_DOMAIN || `${BIND_IP}:${PORT}`;
   const proto = process.env.RAILWAY_PUBLIC_DOMAIN ? 'https' : 'http';
   const url = `${proto}://${host}`;
   const qr = await qrcode.toDataURL(url);
   res.json({ url, qr });
 });
 
-function getLocalIP() {
-  for (const ifaces of Object.values(os.networkInterfaces()))
-    for (const i of ifaces)
-      if (i.family === 'IPv4' && !i.internal) return i.address;
-  return '127.0.0.1';
-}
-
-// Escuchar SOLO en la IP WiFi local — conexiones de otras redes son
-// imposibles a nivel de OS sin necesidad de filtros adicionales
-const BIND_IP = process.env.RAILWAY_PUBLIC_DOMAIN ? '0.0.0.0' : getLocalIP();
+// ── Arrancar el servidor SOLO en la IP WiFi ──
+const BIND_IP = getWiFiIP();
 
 app.listen(PORT, BIND_IP, () => {
   console.log(`\n WiFi Share corriendo`);
-  console.log(` Red:    http://${getLocalIP()}:${PORT}\n`);
-  console.log(` Solo accesible desde la misma red WiFi.\n`);
+  console.log(` Red:    http://${BIND_IP}:${PORT}`);
+  console.log(` Solo accesible desde la misma red WiFi (${BIND_IP.split('.').slice(0,3).join('.')}.x)\n`);
 });
