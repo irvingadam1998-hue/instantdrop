@@ -12,7 +12,6 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-// ── Datos globales (todos los que llegan al servidor comparten la misma red) ──
 const EMOJIS = [
   '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
   '🦁','🐮','🐸','🐵','🐧','🐦','🦆','🦅','🦉','🦋',
@@ -20,20 +19,40 @@ const EMOJIS = [
 ];
 const TIMEOUT = 30000; // 30s sin heartbeat → offline
 
-const devices     = new Map(); // deviceId → device
+// ── Lógica de red igual que SnapDrop: agrupar por subred /24 del cliente ──
+// Dispositivos en 192.168.1.x → mismo grupo. Otra red → grupo distinto, invisibles.
+const rooms       = new Map(); // subnet → Map(deviceId → device)
 const deviceInbox = new Map(); // deviceId → Map(fileId → file)
-const clips       = new Map(); // id → clip
+const roomClips   = new Map(); // subnet → Map(id → clip)
 
+function clientSubnet(req) {
+  const ip = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  // Conexión local (mismo equipo que el servidor) → usar la IP WiFi real
+  if (ip === '127.0.0.1' || ip === '::1') {
+    return getLocalIP().split('.').slice(0, 3).join('.');
+  }
+  return ip.split('.').slice(0, 3).join('.');
+}
+
+function getRoom(subnet) {
+  if (!rooms.has(subnet)) rooms.set(subnet, new Map());
+  return rooms.get(subnet);
+}
 function getInbox(deviceId) {
   if (!deviceInbox.has(deviceId)) deviceInbox.set(deviceId, new Map());
   return deviceInbox.get(deviceId);
+}
+function getRoomClips(subnet) {
+  if (!roomClips.has(subnet)) roomClips.set(subnet, new Map());
+  return roomClips.get(subnet);
 }
 
 // Limpiar dispositivos inactivos cada 10s
 setInterval(() => {
   const now = Date.now();
-  for (const [id, d] of devices.entries())
-    if (now - d.lastSeen > TIMEOUT) devices.delete(id);
+  for (const devMap of rooms.values())
+    for (const [id, d] of devMap.entries())
+      if (now - d.lastSeen > TIMEOUT) devMap.delete(id);
 }, 10000);
 
 function getLocalIP() {
@@ -57,36 +76,40 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Registro de dispositivo ──
 app.post('/api/register', (req, res) => {
+  const subnet = clientSubnet(req);
+  const room   = getRoom(subnet);
   const { deviceId: existing } = req.body || {};
 
-  if (existing && devices.has(existing)) {
-    const d = devices.get(existing);
+  if (existing && room.has(existing)) {
+    const d = room.get(existing);
     d.lastSeen = Date.now();
     return res.json({ deviceId: existing, emoji: d.emoji });
   }
 
   const deviceId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const used     = new Set([...devices.values()].map(d => d.emoji));
+  const used     = new Set([...room.values()].map(d => d.emoji));
   const pool     = EMOJIS.filter(e => !used.has(e));
   const emoji    = (pool.length ? pool : EMOJIS)[Math.floor(Math.random() * (pool.length || EMOJIS.length))];
 
-  devices.set(deviceId, { id: deviceId, emoji, lastSeen: Date.now() });
+  room.set(deviceId, { id: deviceId, emoji, subnet, lastSeen: Date.now() });
   res.json({ deviceId, emoji });
 });
 
 // ── Heartbeat ──
 app.post('/api/heartbeat', (req, res) => {
+  const subnet = clientSubnet(req);
   const { deviceId } = req.body || {};
-  const d = devices.get(deviceId);
+  const d = getRoom(subnet).get(deviceId);
   if (d) d.lastSeen = Date.now();
   res.json({ ok: true });
 });
 
-// ── Listar dispositivos activos (excluyendo el propio) ──
+// ── Listar dispositivos en la misma red (excluyendo el propio) ──
 app.get('/api/devices', (req, res) => {
-  const { me } = req.query;
-  const now    = Date.now();
-  const list   = [...devices.values()]
+  const subnet = clientSubnet(req);
+  const { me }  = req.query;
+  const now     = Date.now();
+  const list    = [...getRoom(subnet).values()]
     .filter(d => d.id !== me && now - d.lastSeen < TIMEOUT)
     .map(({ id, emoji }) => ({ id, emoji }));
   res.json(list);
@@ -99,8 +122,9 @@ app.post('/api/send/:targetId', (req, res) => {
       return res.status(413).json({ error: 'Archivo muy grande. Máximo 50 MB.' });
     if (err) return res.status(500).json({ error: err.message });
 
+    const subnet    = clientSubnet(req);
     const fromId    = req.body.fromId;
-    const sender    = devices.get(fromId);
+    const sender    = getRoom(subnet).get(fromId);
     const fromEmoji = sender ? sender.emoji : '❓';
     const inbox     = getInbox(req.params.targetId);
 
@@ -140,8 +164,9 @@ app.delete('/api/inbox/:fileId', (req, res) => {
   res.json({ ok: true });
 });
 
-// ── Text clips (compartidos entre todos en la red) ──
+// ── Text clips (solo visibles en la misma red) ──
 app.get('/api/clips', (req, res) => {
+  const clips = getRoomClips(clientSubnet(req));
   res.json([...clips.values()].map(({ id, text, mtime }) => ({ id, text, mtime })));
 });
 
@@ -149,12 +174,14 @@ app.post('/api/clips', (req, res) => {
   const text = (req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Texto vacío' });
   if (text.length > 10000) return res.status(400).json({ error: 'Texto muy largo' });
+  const clips = getRoomClips(clientSubnet(req));
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   clips.set(id, { id, text, mtime: new Date() });
   res.json({ ok: true, id });
 });
 
 app.delete('/api/clips/:id', (req, res) => {
+  const clips = getRoomClips(clientSubnet(req));
   if (!clips.has(req.params.id)) return res.status(404).json({ error: 'Not found' });
   clips.delete(req.params.id);
   res.json({ ok: true });
@@ -170,7 +197,9 @@ app.get('/api/qr', async (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-  const ip = getLocalIP();
+  const ip     = getLocalIP();
+  const subnet = ip.split('.').slice(0, 3).join('.');
   console.log(`\n WiFi Share corriendo`);
-  console.log(` Red:    http://${ip}:${PORT}\n`);
+  console.log(` Red:    http://${ip}:${PORT}`);
+  console.log(` Subred: ${subnet}.x  (solo dispositivos en esta subred se verán)\n`);
 });
