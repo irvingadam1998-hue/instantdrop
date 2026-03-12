@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>wshare</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0c0c0c;
+      --surface: #141414;
+      --border: rgba(255,255,255,0.07);
+      --accent: #cbff47;
+      --text: #f0f0f0;
+      --muted: rgba(240,240,240,0.3);
+      --muted2: rgba(240,240,240,0.12);
+    }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 24px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .logo {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: var(--accent);
+      text-transform: lowercase;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .ip-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 4px 10px;
+      cursor: pointer;
+      transition: color 0.15s;
+    }
+    .ip-badge:hover { color: var(--text); }
+
+    .ctrl-btn {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      transition: all 0.15s;
+    }
+    .ctrl-btn:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+    .ctrl-btn.accent { background: var(--accent); color: #000; border-color: var(--accent); font-weight: 700; }
+    .ctrl-btn.accent:hover { opacity: 0.85; }
+
+    /* ── Main ── */
+    main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      gap: 32px;
+    }
+
+    /* drop diamond */
+    .drop-wrap {
+      position: relative;
+      width: 260px; height: 260px;
+      display: flex; align-items: center; justify-content: center;
+    }
+
+    /* ── Animations ── */
+    @keyframes spin-slow   { to { transform: rotate(calc(45deg + 360deg)); } }
+    @keyframes spin-rev    { to { transform: rotate(calc(45deg - 360deg)); } }
+    @keyframes pulse-ring  {
+      0%   { opacity: 0.06; transform: rotate(45deg) scale(1); }
+      50%  { opacity: 0.14; transform: rotate(45deg) scale(1.04); }
+      100% { opacity: 0.06; transform: rotate(45deg) scale(1); }
+    }
+    @keyframes dot-orbit {
+      from { transform: rotate(0deg) translateX(130px) rotate(0deg); }
+      to   { transform: rotate(360deg) translateX(130px) rotate(-360deg); }
+    }
+    @keyframes dot-orbit2 {
+      from { transform: rotate(180deg) translateX(90px) rotate(-180deg); }
+      to   { transform: rotate(540deg) translateX(90px) rotate(-540deg); }
+    }
+    @keyframes icon-breathe {
+      0%, 100% { box-shadow: 0 0 0 0 rgba(203,255,71,0); }
+      50%       { box-shadow: 0 0 0 8px rgba(203,255,71,0.06); }
+    }
+    @keyframes scan-line {
+      0%   { transform: rotate(45deg) scaleY(0); opacity: 0; }
+      10%  { opacity: 1; }
+      50%  { transform: rotate(45deg) scaleY(1); opacity: 0.5; }
+      100% { transform: rotate(405deg) scaleY(0); opacity: 0; }
+    }
+
+    .diamond {
+      position: absolute;
+      width: 180px; height: 180px;
+      border: 1px solid rgba(255,255,255,0.09);
+      transform: rotate(45deg);
+      border-radius: 18px;
+      transition: border-color 0.3s;
+      animation: spin-rev 18s linear infinite;
+    }
+    .diamond-outer {
+      width: 260px; height: 260px;
+      border-radius: 28px;
+      border-color: rgba(255,255,255,0.05);
+      animation: pulse-ring 3.5s ease-in-out infinite, spin-slow 28s linear infinite;
+    }
+
+    /* scanning dot */
+    .orbit-dot {
+      position: absolute;
+      width: 5px; height: 5px;
+      border-radius: 50%;
+      background: var(--accent);
+      opacity: 0.7;
+      animation: dot-orbit 6s linear infinite;
+      z-index: 4;
+    }
+    .orbit-dot2 {
+      position: absolute;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.3);
+      animation: dot-orbit2 9s linear infinite;
+      z-index: 4;
+    }
+
+    /* scan sweep */
+    .scan-sweep {
+      position: absolute;
+      width: 130px; height: 2px;
+      left: 50%; top: 50%;
+      margin-top: -1px;
+      transform-origin: left center;
+      background: linear-gradient(90deg, transparent, rgba(203,255,71,0.25));
+      border-radius: 0 2px 2px 0;
+      animation: none;
+      opacity: 0;
+      z-index: 3;
+    }
+    /* idle sweep loops */
+    .scan-sweep {
+      animation: sweep 4s ease-in-out infinite;
+    }
+    @keyframes sweep {
+      0%   { transform: rotate(-40deg); opacity: 0; }
+      5%   { opacity: 1; }
+      100% { transform: rotate(320deg); opacity: 0; }
+    }
+
+    #drop-zone {
+      position: absolute;
+      inset: 0;
+      cursor: pointer;
+      z-index: 5;
+      border-radius: 50%;
+    }
+    #drop-zone.drag-over ~ .diamond {
+      border-color: var(--accent);
+      animation: spin-rev 4s linear infinite;
+    }
+    #drop-zone.drag-over ~ .diamond-outer {
+      border-color: rgba(203,255,71,0.4);
+      animation: spin-slow 6s linear infinite;
+    }
+
+    /* center icon */
+    .center-icon {
+      position: relative;
+      z-index: 6;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .icon-box {
+      width: 52px; height: 52px;
+      border-radius: 14px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.3rem;
+      animation: icon-breathe 3s ease-in-out infinite;
+      transition: transform 0.2s;
+    }
+
+    .icon-label {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--muted);
+      letter-spacing: 0.06em;
+    }
+
+    /* ── Floating file icons ── */
+    .float-icon {
+      position: absolute;
+      font-size: 1.1rem;
+      pointer-events: none;
+      z-index: 3;
+      opacity: 0;
+      filter: grayscale(0.3);
+      transition: none;
+      transform-origin: center;
+    }
+
+    /* bottom hint */
+    .hint-block {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .hint-text {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    .add-btn {
+      width: 42px; height: 42px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      color: #000;
+      font-size: 1.2rem;
+      font-weight: 300;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      transition: transform 0.15s, opacity 0.15s;
+      line-height: 1;
+    }
+    .add-btn:hover { transform: scale(1.07); }
+    .add-btn:active { transform: scale(0.95); }
+
+    #file-input { display: none; }
+
+    /* files row */
+    .files-row {
+      display: flex;
+      gap: 8px;
+      max-width: 520px;
+      overflow-x: auto;
+      padding: 4px 2px;
+      scrollbar-width: none;
+    }
+    .files-row::-webkit-scrollbar { display: none; }
+
+    .file-pill {
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 12px;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      max-width: 180px;
+    }
+    .file-pill:hover { border-color: var(--accent); background: rgba(203,255,71,0.04); }
+
+    .pill-icon { font-size: 1rem; flex-shrink: 0; }
+    .pill-info { min-width: 0; }
+    .pill-name {
+      font-size: 0.75rem; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .pill-size { font-size: 0.65rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+    .pill-del {
+      margin-left: 4px;
+      flex-shrink: 0;
+      background: none; border: none;
+      color: var(--muted);
+      font-size: 0.7rem;
+      cursor: pointer;
+      padding: 2px;
+      border-radius: 4px;
+      transition: color 0.15s;
+    }
+    .pill-del:hover { color: #ff5f5f; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-chip {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 3px 8px;
+    }
+    .stat-chip b { color: var(--accent); font-weight: 500; }
+
+    .version {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.62rem;
+      color: rgba(255,255,255,0.13);
+    }
+
+    /* ── Upload overlay ── */
+    #upload-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.75);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #upload-overlay.open { display: flex; }
+
+    .upload-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .upload-ring {
+      width: 80px; height: 80px;
+      border-radius: 50%;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      animation: spin 0.9s linear infinite;
+      display: flex; align-items: center; justify-content: center;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .upload-pct {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      color: var(--accent);
+      position: absolute;
+    }
+
+    .upload-label { font-size: 0.8rem; color: var(--muted); }
+
+    /* ── QR panel ── */
+    #qr-panel {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.8);
+      backdrop-filter: blur(10px);
+      z-index: 100;
+      align-items: center; justify-content: center;
+    }
+    #qr-panel.open { display: flex; }
+
+    .qr-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      min-width: 260px;
+    }
+
+    .qr-box img {
+      width: 170px; height: 170px;
+      border-radius: 10px;
+      background: #fff;
+      padding: 8px;
+    }
+
+    .qr-url {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.75rem;
+      color: var(--accent);
+      background: rgba(203,255,71,0.06);
+      border: 1px solid rgba(203,255,71,0.15);
+      border-radius: 8px;
+      padding: 7px 14px;
+      text-align: center;
+      width: 100%;
+    }
+    .qr-url a { color: inherit; text-decoration: none; }
+
+    .qr-hint { font-size: 0.72rem; color: var(--muted); text-align: center; line-height: 1.5; }
+
+    .btn-close {
+      width: 100%;
+      padding: 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: all 0.15s;
+    }
+    .btn-close:hover { color: var(--text); border-color: rgba(255,255,255,0.2); }
+
+    /* ── Toast ── */
+    #toast {
+      position: fixed;
+      bottom: 20px; left: 50%;
+      transform: translateX(-50%) translateY(50px);
+      opacity: 0;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 99px;
+      padding: 8px 18px;
+      font-size: 0.78rem;
+      color: var(--text);
+      transition: all 0.25s;
+      z-index: 200;
+      white-space: nowrap;
+    }
+    #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    #toast::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); margin-right: 8px; vertical-align: middle; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">wshare</div>
+  <div class="header-right">
+    <div class="ip-badge" id="ip-badge" onclick="openQR()">···</div>
+    <button class="ctrl-btn" onclick="openQR()" title="QR">⊞</button>
+    <button class="ctrl-btn accent" onclick="document.getElementById('file-input').click()" title="Subir">+</button>
+  </div>
+</header>
+
+<main>
+  <div class="drop-wrap">
+    <div id="drop-zone"></div>
+    <div class="scan-sweep"></div>
+    <div class="orbit-dot"></div>
+    <div class="orbit-dot2"></div>
+    <div class="diamond diamond-outer"></div>
+    <div class="diamond"></div>
+    <div class="center-icon">
+      <div class="icon-box">↑</div>
+      <span class="icon-label" id="center-label">este dispositivo</span>
+    </div>
+  </div>
+
+  <div class="hint-block">
+    <span class="hint-text">arrastra o selecciona un archivo</span>
+    <button class="add-btn" onclick="document.getElementById('file-input').click()">+</button>
+  </div>
+
+  <div class="files-row" id="files-row"></div>
+</main>
+
+<footer>
+  <div class="footer-left">
+    <div class="stat-chip"><b id="stat-count">0</b> archivos</div>
+    <div class="stat-chip">máx <b>50mb</b></div>
+  </div>
+  <span class="version">v1.0.0</span>
+</footer>
+
+<input type="file" id="file-input" multiple>
+
+<!-- Upload overlay -->
+<div id="upload-overlay">
+  <div class="upload-box">
+    <div style="position:relative;width:80px;height:80px;display:flex;align-items:center;justify-content:center;">
+      <div class="upload-ring"></div>
+      <span class="upload-pct" id="upload-pct">0%</span>
+    </div>
+    <span class="upload-label" id="upload-label">subiendo...</span>
+  </div>
+</div>
+
+<!-- QR panel -->
+<div id="qr-panel" onclick="closeQR()">
+  <div class="qr-box" onclick="event.stopPropagation()">
+    <img id="qr-img" src="" alt="QR">
+    <div class="qr-url"><a id="qr-url" href="#" target="_blank">cargando...</a></div>
+    <p class="qr-hint">Abre esta URL en tu móvil.<br>Misma red WiFi requerida.</p>
+    <button class="btn-close" onclick="closeQR()">cerrar</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+  let fileCache = [];
+
+  // QR
+  async function loadQR() {
+    const { url, qr } = await fetch('/api/qr').then(r => r.json());
+    document.getElementById('qr-img').src = qr;
+    const a = document.getElementById('qr-url');
+    a.href = url; a.textContent = url;
+    try {
+      const ip = new URL(url).hostname;
+      document.getElementById('ip-badge').textContent = ip;
+      document.getElementById('center-label').textContent = ip;
+    } catch {}
+  }
+
+  function openQR() { document.getElementById('qr-panel').classList.add('open'); }
+  function closeQR() { document.getElementById('qr-panel').classList.remove('open'); }
+
+  // Files
+  async function loadFiles() {
+    fileCache = await fetch('/api/files').then(r => r.json());
+    renderFiles();
+    document.getElementById('stat-count').textContent = fileCache.length;
+  }
+
+  function renderFiles() {
+    const row = document.getElementById('files-row');
+    if (!fileCache.length) { row.innerHTML = ''; return; }
+    row.innerHTML = fileCache.map(f => `
+      <div class="file-pill" onclick="downloadFile('${esc(f.name)}')">
+        <span class="pill-icon">${fileIcon(f.name)}</span>
+        <div class="pill-info">
+          <div class="pill-name" title="${f.name}">${f.name}</div>
+          <div class="pill-size">${formatSize(f.size)}</div>
+        </div>
+        <button class="pill-del" onclick="event.stopPropagation();deleteFile('${esc(f.name)}')">✕</button>
+      </div>
+    `).join('');
+  }
+
+  // Upload
+  function uploadFiles(files) {
+    if (!files.length) return;
+    const form = new FormData();
+    for (const f of files) form.append('files', f);
+
+    const overlay = document.getElementById('upload-overlay');
+    const pct = document.getElementById('upload-pct');
+    const label = document.getElementById('upload-label');
+
+    overlay.classList.add('open');
+    pct.textContent = '0%';
+    label.textContent = `subiendo ${files.length} archivo${files.length > 1 ? 's' : ''}...`;
+
+    const xhr = new XMLHttpRequest();
+    xhr.upload.addEventListener('progress', e => {
+      if (e.lengthComputable) {
+        const p = Math.round(e.loaded / e.total * 100);
+        pct.textContent = p + '%';
+      }
+    });
+    xhr.onload = () => {
+      overlay.classList.remove('open');
+      const res = JSON.parse(xhr.responseText);
+      if (res.error) { toast(res.error); return; }
+      loadFiles();
+      toast(`${res.files.length} archivo${res.files.length > 1 ? 's' : ''} listo${res.files.length > 1 ? 's' : ''}`);
+    };
+    xhr.open('POST', '/api/upload');
+    xhr.send(form);
+  }
+
+  function downloadFile(name) {
+    const a = document.createElement('a');
+    a.href = `/api/download/${encodeURIComponent(name)}`;
+    a.download = name; a.click();
+  }
+
+  async function deleteFile(name) {
+    await fetch(`/api/files/${encodeURIComponent(name)}`, { method: 'DELETE' });
+    loadFiles();
+    toast('eliminado');
+  }
+
+  // Drag & drop
+  const zone = document.getElementById('drop-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    uploadFiles([...e.dataTransfer.files]);
+  });
+
+  document.getElementById('file-input').addEventListener('change', e => {
+    uploadFiles([...e.target.files]);
+    e.target.value = '';
+  });
+
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => {
+    e.preventDefault();
+    if (!zone.contains(e.target) && e.dataTransfer.files.length)
+      uploadFiles([...e.dataTransfer.files]);
+  });
+
+  // Utils
+  function esc(s) { return s.replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+
+  function formatSize(b) {
+    if (b < 1024) return b + 'b';
+    if (b < 1024 ** 2) return (b / 1024).toFixed(1) + 'kb';
+    return (b / 1024 ** 2).toFixed(1) + 'mb';
+  }
+
+  function fileIcon(name) {
+    const ext = name.split('.').pop().toLowerCase();
+    const m = { jpg:'🖼', jpeg:'🖼', png:'🖼', gif:'🖼', webp:'🖼', svg:'🖼',
+      mp4:'▶', mkv:'▶', avi:'▶', mov:'▶', mp3:'♪', wav:'♪', flac:'♪',
+      pdf:'📄', doc:'📝', docx:'📝', xls:'📊', xlsx:'📊',
+      zip:'📦', rar:'📦', '7z':'📦', txt:'📃' };
+    return m[ext] || '◻';
+  }
+
+  let tt;
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.childNodes[el.childNodes.length - 1].textContent = msg;
+    el.classList.add('show');
+    clearTimeout(tt);
+    tt = setTimeout(() => el.classList.remove('show'), 2500);
+  }
+
+  // ── Floating file icons ──
+  const floatIcons = ['📄','🖼','🎵','📦','📝','📊','▶','📃','💻','🗂'];
+  const wrap = document.querySelector('.drop-wrap');
+  const CX = 130, CY = 130; // center of wrap (260/2)
+
+  function spawnFloatIcon() {
+    const el = document.createElement('div');
+    el.className = 'float-icon';
+    el.textContent = floatIcons[Math.floor(Math.random() * floatIcons.length)];
+
+    // spawn on a random point of a circle around the area
+    const angle = Math.random() * Math.PI * 2;
+    const spawnR = 115 + Math.random() * 25;
+    const startX = CX + Math.cos(angle) * spawnR;
+    const startY = CY + Math.sin(angle) * spawnR;
+
+    // end slightly past center with a little offset
+    const endX = CX + (Math.random() - 0.5) * 18;
+    const endY = CY + (Math.random() - 0.5) * 18;
+
+    el.style.left = startX + 'px';
+    el.style.top  = startY + 'px';
+    el.style.transform = 'translate(-50%, -50%) scale(0.6)';
+    wrap.appendChild(el);
+
+    const dur = 2200 + Math.random() * 1400; // 2.2s – 3.6s
+
+    // keyframe animation via Web Animations API
+    el.animate([
+      { opacity: 0,   transform: `translate(-50%,-50%) scale(0.5)`,
+        left: startX + 'px', top: startY + 'px' },
+      { opacity: 0.85, transform: `translate(-50%,-50%) scale(1)`,
+        left: startX + 'px', top: startY + 'px', offset: 0.15 },
+      { opacity: 0.7,  transform: `translate(-50%,-50%) scale(0.85)`,
+        left: (startX * 0.4 + endX * 0.6) + 'px',
+        top:  (startY * 0.4 + endY * 0.6) + 'px', offset: 0.75 },
+      { opacity: 0,    transform: `translate(-50%,-50%) scale(0.3)`,
+        left: endX + 'px', top: endY + 'px' }
+    ], { duration: dur, easing: 'ease-in', fill: 'forwards' })
+      .finished.then(() => el.remove());
+  }
+
+  // spawn 1 icon every ~700ms with some randomness
+  function scheduleNext() {
+    spawnFloatIcon();
+    setTimeout(scheduleNext, 500 + Math.random() * 600);
+  }
+  setTimeout(scheduleNext, 800);
+
+  loadQR();
+  loadFiles();
+  setInterval(loadFiles, 5000);
+</script>
+</body>
+</html>
