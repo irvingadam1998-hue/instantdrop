@@ -87,20 +87,21 @@ function getRoomClips(subnet) {
 }
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
 
-/* BLOQUEO DE CONEXIONES EXTERNAS */
+/* BLOQUEO DE CONEXIONES EXTERNAS — va primero, antes de servir cualquier archivo */
 app.use((req, res, next) => {
   const ip = getClientIP(req);
 
   if (ip === '127.0.0.1' || ip === '::1') return next();
 
   if (!isPrivateIP(ip)) {
-    return res.status(403).json({ error: 'Acceso permitido solo desde red local' });
+    return res.status(403).send('Acceso permitido solo desde red local WiFi.');
   }
 
   next();
 });
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 /* LIMPIAR DISPOSITIVOS INACTIVOS */
 setInterval(() => {
