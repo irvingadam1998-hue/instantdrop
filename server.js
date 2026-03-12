@@ -16,31 +16,34 @@ const upload = multer({
   limits: { fileSize: 50 * 1024 * 1024 }
 });
 
-// ── Restricción de red local ──
-function isLocalNetwork(clientIp) {
-  // Solo omitir restricción si hay un dominio público de Railway explícito
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) return true;
-
-  const normalize = ip => ip.replace(/^::ffff:/, '');
-  const client = normalize(clientIp || '');
-
-  // Permitir loopback
-  if (client === '127.0.0.1' || client === '::1') return true;
-
-  const serverIp = getLocalIP();
-  const sp = serverIp.split('.');
-  const cp = client.split('.');
-
-  if (cp.length !== 4) return false;
-
-  // Misma subred /24
-  return sp[0] === cp[0] && sp[1] === cp[1] && sp[2] === cp[2];
+// Todas las subredes /24 de las interfaces locales activas
+function getLocalSubnets() {
+  const subnets = new Set();
+  for (const ifaces of Object.values(os.networkInterfaces()))
+    for (const i of ifaces)
+      if (i.family === 'IPv4' && !i.internal)
+        subnets.add(i.address.split('.').slice(0, 3).join('.'));
+  return subnets;
 }
 
+function isLocalNetwork(rawIp) {
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) return true;
+
+  const ip = (rawIp || '').replace(/^::ffff:/, '');
+  if (ip === '127.0.0.1' || ip === '::1') return true;
+
+  const parts = ip.split('.');
+  if (parts.length !== 4) return false;
+
+  const clientSubnet = parts.slice(0, 3).join('.');
+  return getLocalSubnets().has(clientSubnet);
+}
+
+// Bloquear cualquier request que no venga de la misma red local
 app.use((req, res, next) => {
-  const clientIp = req.ip || req.socket.remoteAddress || '';
+  const clientIp = (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
   if (!isLocalNetwork(clientIp)) {
-    return res.status(403).send('Acceso permitido solo desde la red local WiFi.');
+    return res.status(403).send('Acceso solo desde la red WiFi local.');
   }
   next();
 });
@@ -114,9 +117,7 @@ app.delete('/api/clips/:id', (req, res) => {
 
 // QR
 app.get('/api/qr', async (req, res) => {
-  const host = process.env.RAILWAY_PUBLIC_DOMAIN
-    || process.env.HOST
-    || `${getLocalIP()}:${PORT}`;
+  const host = process.env.RAILWAY_PUBLIC_DOMAIN || `${getLocalIP()}:${PORT}`;
   const proto = process.env.RAILWAY_PUBLIC_DOMAIN ? 'https' : 'http';
   const url = `${proto}://${host}`;
   const qr = await qrcode.toDataURL(url);
@@ -130,8 +131,12 @@ function getLocalIP() {
   return '127.0.0.1';
 }
 
-app.listen(PORT, '0.0.0.0', () => {
+// Escuchar SOLO en la IP WiFi local — conexiones de otras redes son
+// imposibles a nivel de OS sin necesidad de filtros adicionales
+const BIND_IP = process.env.RAILWAY_PUBLIC_DOMAIN ? '0.0.0.0' : getLocalIP();
+
+app.listen(PORT, BIND_IP, () => {
   console.log(`\n WiFi Share corriendo`);
-  console.log(` Local:  http://localhost:${PORT}`);
   console.log(` Red:    http://${getLocalIP()}:${PORT}\n`);
+  console.log(` Solo accesible desde la misma red WiFi.\n`);
 });
