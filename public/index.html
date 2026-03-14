@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QuickShare</title>
+  <title>InstantDrop</title>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7739241937608835"
     crossorigin="anonymous"></script>
   <style>
@@ -992,7 +992,7 @@
 <body>
 
   <header>
-    <div class="logo">QuickShare</div>
+    <div class="logo">InstantDrop</div>
     <div class="header-right">
       <div class="my-badge">
         <span class="my-emoji" id="my-emoji">··</span>
@@ -1112,9 +1112,9 @@
 
   <script>
     // ── Estado ──
-    let myDeviceId = localStorage.getItem('QuickShare-deviceId');
-    let myToken = localStorage.getItem('QuickShare-token');
-    let myEmoji = localStorage.getItem('QuickShare-emoji') || '··';
+    let myDeviceId = localStorage.getItem('InstantDrop-deviceId');
+    let myToken = localStorage.getItem('InstantDrop-token');
+    let myEmoji = localStorage.getItem('InstantDrop-emoji') || '··';
     let selectedId = null;
 
     // WebRTC
@@ -1134,9 +1134,9 @@
       myDeviceId = res.deviceId;
       myToken = res.token;
       myEmoji = res.emoji;
-      localStorage.setItem('QuickShare-deviceId', myDeviceId);
-      localStorage.setItem('QuickShare-token', myToken);
-      localStorage.setItem('QuickShare-emoji', myEmoji);
+      localStorage.setItem('InstantDrop-deviceId', myDeviceId);
+      localStorage.setItem('InstantDrop-token', myToken);
+      localStorage.setItem('InstantDrop-emoji', myEmoji);
       document.getElementById('my-emoji').textContent = myEmoji;
     }
 
