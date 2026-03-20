@@ -14,9 +14,20 @@ const EMOJIS = [
 ];
 const TIMEOUT = 30000;
 
-const rooms      = new Map(); // subnet → Map(deviceId → device)
-const roomClips  = new Map(); // subnet → Map(id → clip)
-const sseClients = new Map(); // deviceId → res  ← solo para señalización WebRTC
+const rooms          = new Map(); // subnet → Map(deviceId → device)
+const roomClips      = new Map(); // subnet → Map(id → clip)
+const sseClients     = new Map(); // deviceId → res  ← solo para señalización WebRTC
+const pendingSignals = new Map(); // deviceId → [{from,type,data,ts}] señales en espera
+
+// Limpiar señales en espera viejas cada 60s
+setInterval(() => {
+  const cutoff = Date.now() - 30000;
+  for (const [id, sigs] of pendingSignals.entries()) {
+    const fresh = sigs.filter(s => s.ts > cutoff);
+    if (fresh.length) pendingSignals.set(id, fresh);
+    else pendingSignals.delete(id);
+  }
+}, 60000);
 
 // ── Helpers ──
 function getLocalIP() {
@@ -163,6 +174,17 @@ app.get('/api/events', (req, res) => {
   res.flushHeaders();
 
   sseClients.set(deviceId, res);
+
+  // Entregar señales que llegaron antes de que este SSE estuviera listo
+  const queued = pendingSignals.get(deviceId);
+  if (queued) {
+    const now = Date.now();
+    for (const s of queued)
+      if (now - s.ts < 30000)
+        res.write(`data: ${JSON.stringify({ from: s.from, type: s.type, data: s.data })}\n\n`);
+    pendingSignals.delete(deviceId);
+  }
+
   const ping = setInterval(() => res.write(': ping\n\n'), 25000);
   req.on('close', () => { clearInterval(ping); sseClients.delete(deviceId); });
 });
@@ -181,7 +203,13 @@ app.post('/api/signal', rateLimit(60, 10_000), (req, res) => {
     return res.status(403).json({ error: 'Dispositivo fuera de tu red' });
 
   const target = sseClients.get(to);
-  if (target) target.write(`data: ${JSON.stringify({ from, type, data })}\n\n`);
+  if (target) {
+    target.write(`data: ${JSON.stringify({ from, type, data })}\n\n`);
+  } else {
+    // Receptor aún no tiene SSE activo — encolar para entregar cuando conecte
+    if (!pendingSignals.has(to)) pendingSignals.set(to, []);
+    pendingSignals.get(to).push({ from, type, data, ts: Date.now() });
+  }
   res.json({ ok: !!target });
 });
 
