@@ -1706,8 +1706,11 @@
     }
 
     // ── WebRTC: señalización via SSE ──
+    let _es = null;
     function connectEvents() {
+      if (_es) { _es.close(); _es = null; }
       const es = new EventSource(`/api/events?deviceId=${myDeviceId}&token=${myToken}`);
+      _es = es;
       es.onmessage = async (e) => {
         const { from, type, data } = JSON.parse(e.data);
 
@@ -1727,7 +1730,11 @@
           if (pc && data) await pc.addIceCandidate(data).catch(() => { });
         }
       };
-      es.onerror = () => setTimeout(connectEvents, 3000);
+      es.onerror = () => {
+        es.close(); // evita auto-reconexión del browser
+        _es = null;
+        setTimeout(connectEvents, 3000);
+      };
     }
 
     function createPC(peerId, initiator) {
@@ -2203,6 +2210,12 @@
     async function poll() {
       await Promise.all([loadDevices(), loadAll()]);
     }
+
+    // Cuando la pestaña vuelve a estar visible, hacer poll inmediato
+    // (el browser throttlea setInterval en tabs en background)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) poll();
+    });
 
     // ── Init ──
     (async () => {
