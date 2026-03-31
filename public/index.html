@@ -1695,6 +1695,16 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     let myEmoji = localStorage.getItem('InstantDrop-emoji') || '··';
     let selectedId = null;
     let isBusy = false;
+    window.dataLayer = window.dataLayer || [];
+
+    function track(eventName, params = {}) {
+      window.dataLayer.push({
+        event: eventName,
+        page_path: location.pathname,
+        page_lang: _lang,
+        ...params
+      });
+    }
 
     // WebRTC
     const STUN = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
@@ -1748,7 +1758,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         document.getElementById('ip-badge').textContent = ip;
       } catch { }
     }
-    function openQR() { document.getElementById('qr-panel').classList.add('open'); }
+    function openQR() {
+      track('open_qr');
+      document.getElementById('qr-panel').classList.add('open');
+    }
     function closeQR() { document.getElementById('qr-panel').classList.remove('open'); }
 
     // ── Dispositivos ──
@@ -1815,6 +1828,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         return;
       }
       selectedId = id;
+      track('select_device', { target_device_emoji: emoji || '' });
       updateCenterIcon(emoji);
       updateHint();
       document.querySelectorAll('.device-bubble').forEach(el => {
@@ -2030,6 +2044,12 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
     async function sendFiles(files, targetId) {
       if (isBusy) { toast(t('toast.busy')); return; }
+      const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
+      track('file_send_started', {
+        file_count: files.length,
+        total_bytes: totalBytes,
+        target_device_id: targetId
+      });
       setBusy(true);
       pendingFiles.set(targetId, files);
       showOverlay(t('overlay.connecting'), '');
@@ -2041,6 +2061,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
     async function sendText(text, targetId) {
       if (isBusy) { toast(t('toast.busy')); return; }
+      track('text_send_started', {
+        text_length: text.length,
+        target_device_id: targetId
+      });
       setBusy(true);
       pendingTexts.set(targetId, text);
       showOverlay(t('overlay.connecting'), '');
@@ -2056,6 +2080,10 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         const text = pendingTexts.get(peerId);
         pendingTexts.delete(peerId);
         dc.send(JSON.stringify({ type: 'text', content: text }));
+        track('text_send_completed', {
+          text_length: text.length,
+          target_device_id: peerId
+        });
         hideOverlay();
         toast(t('toast.text_sent'));
         dc.close();
@@ -2110,6 +2138,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       }
 
       hideOverlay();
+      track('file_send_completed', {
+        file_count: files.length,
+        total_bytes: files.reduce((sum, file) => sum + file.size, 0),
+        target_device_id: peerId
+      });
       toast(t('toast.sent'));
       // No cerrar dc aquí — el receptor lo cierra cuando termina de procesar
       setTimeout(() => { peerConnections.get(peerId)?.close(); peerConnections.delete(peerId); }, 4000);
@@ -2140,13 +2173,24 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
           let msg;
           try { msg = JSON.parse(e.data); } catch { return; }
           if (msg.type === 'text') {
-            if (typeof msg.content === 'string') showReceivedText(msg.content);
+            if (typeof msg.content === 'string') {
+              track('text_received', {
+                text_length: msg.content.length,
+                source_device_id: peerId
+              });
+              showReceivedText(msg.content);
+            }
             return;
           }
           // Solicitud: mostrar modal ANTES de recibir datos
           if (msg.type === 'request') {
             if (!Array.isArray(msg.files) || !msg.files.length) return;
             expectedFiles = msg.files.length;
+            track('incoming_file_request', {
+              file_count: msg.files.length,
+              total_bytes: msg.files.reduce((sum, file) => sum + (file.size || 0), 0),
+              source_device_id: peerId
+            });
             showIncomingRequest(dc, msg.files, peerId);
             return;
           }
@@ -2160,6 +2204,11 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
             const a = document.createElement('a');
             a.href = url; a.download = state.name; a.click();
             setTimeout(() => URL.revokeObjectURL(url), 1000);
+            track('file_received', {
+              file_name: state.name,
+              file_bytes: state.size,
+              source_device_id: peerId
+            });
             hideOverlay();
             toast(`📥 ${state.name}`);
             state = null;
@@ -2230,6 +2279,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
     function acceptIncoming() {
       if (!_incomingDC) return;
+      track('incoming_file_accepted');
       _incomingDC.send(JSON.stringify({ type: 'accept' }));
       document.getElementById('incoming-panel').classList.remove('open');
       toast(t('toast.downloading'));
@@ -2237,6 +2287,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     }
 
     function rejectIncoming() {
+      track('incoming_file_rejected');
       if (_incomingDC) {
         _incomingDC.send(JSON.stringify({ type: 'reject' }));
         setTimeout(() => _incomingDC?.close(), 200);
@@ -2259,6 +2310,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     // ── Panel de texto ──
     function openText() {
       if (!selectedId) { toast(t('toast.choose_first')); return; }
+      track('open_text_panel', { target_device_id: selectedId });
       const panel = document.getElementById('text-panel');
       const input = document.getElementById('text-input');
       input.value = '';
@@ -2305,6 +2357,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     }
     function copyRecv() {
       navigator.clipboard.writeText(_recvText).then(() => {
+        track('copy_received_text', { text_length: _recvText.length });
         const btn = document.getElementById('recv-copy-btn');
         btn.classList.add('copied');
         document.getElementById('recv-copy-label').textContent = t('app.copied');
@@ -2330,6 +2383,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         body: JSON.stringify({ text })
       }).then(r => r.json());
       if (res.error) { toast(res.error); return; }
+      track('clip_shared', { text_length: text.length });
       loadAll();
       toast(t('toast.text_shared'));
     });
@@ -2361,10 +2415,14 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     }
 
     function copyClip(text) {
-      navigator.clipboard.writeText(text).then(() => toast(t('toast.copied_clip')));
+      navigator.clipboard.writeText(text).then(() => {
+        track('clip_copied', { text_length: text.length });
+        toast(t('toast.copied_clip'));
+      });
     }
     async function deleteClip(id) {
       await fetch(`/api/clips/${id}`, { method: 'DELETE' });
+      track('clip_deleted');
       loadAll();
     }
 
