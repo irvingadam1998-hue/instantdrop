@@ -132,7 +132,7 @@ app.use((req, res, next) => {
     'Content-Security-Policy',
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://pagead2.googlesyndication.com https://gc.zgo.at https://www.google-analytics.com https://static.cloudflareinsights.com",
+      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://pagead2.googlesyndication.com https://gc.zgo.at https://www.google-analytics.com https://static.cloudflareinsights.com https://*.adtrafficquality.google",
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src https://fonts.gstatic.com",
       "img-src 'self' data: https:",
