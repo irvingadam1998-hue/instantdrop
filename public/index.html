@@ -8,15 +8,18 @@
   <meta name="description"
     content="InstantDrop te permite compartir archivos y texto entre dispositivos en la misma red WiFi sin cuentas, sin cables y sin subir nada a la nube.">
   <link rel="canonical" href="https://instantdrop.site/">
-  <script>(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
-new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
-j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
-'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
-})(window,document,'script','dataLayer','GTM-PCHSMJT6');</script>
+  <link rel="icon" href="/favicon.ico">
+  <script>(function (w, d, s, l, i) {
+      w[l] = w[l] || []; w[l].push({
+        'gtm.start':
+          new Date().getTime(), event: 'gtm.js'
+      }); var f = d.getElementsByTagName(s)[0],
+        j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+          'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+    })(window, document, 'script', 'dataLayer', 'GTM-PCHSMJT6');</script>
   <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7739241937608835"
     crossorigin="anonymous"></script>
-  <script data-goatcounter="https://ivasquez.goatcounter.com/count"
-    async src="//gc.zgo.at/count.js"></script>
+  <script data-goatcounter="https://ivasquez.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
 
@@ -1053,6 +1056,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       margin-right: 8px;
       vertical-align: middle;
     }
+
     /* ── Incoming file modal ── */
     #incoming-panel {
       display: flex;
@@ -1121,18 +1125,41 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     }
 
     @keyframes incoming-wiggle {
-      0%, 100% { transform: rotate(-10deg); }
-      50% { transform: rotate(10deg); }
+
+      0%,
+      100% {
+        transform: rotate(-10deg);
+      }
+
+      50% {
+        transform: rotate(10deg);
+      }
     }
 
     @keyframes incoming-bounce {
-      0%, 100% { transform: translateY(0) scale(1); }
-      50% { transform: translateY(-10px) scale(1.12); }
+
+      0%,
+      100% {
+        transform: translateY(0) scale(1);
+      }
+
+      50% {
+        transform: translateY(-10px) scale(1.12);
+      }
     }
 
     @keyframes incoming-arrow {
-      0%, 100% { transform: translateX(0); opacity: 0.5; }
-      50% { transform: translateX(5px); opacity: 1; }
+
+      0%,
+      100% {
+        transform: translateX(0);
+        opacity: 0.5;
+      }
+
+      50% {
+        transform: translateX(5px);
+        opacity: 1;
+      }
     }
 
     .incoming-title {
@@ -1225,24 +1252,44 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       transition: color 0.15s, border-color 0.15s;
       height: 22px;
     }
+
     .lang-btn:hover {
       color: var(--text);
       border-color: rgba(255, 255, 255, 0.2);
     }
 
     /* ── Touch: eliminar highlight y delay táctil ── */
-    button, .device-bubble, .file-pill, .clip-pill, .ip-badge, .ctrl-btn {
+    button,
+    .device-bubble,
+    .file-pill,
+    .clip-pill,
+    .ip-badge,
+    .ctrl-btn {
       -webkit-tap-highlight-color: transparent;
       touch-action: manipulation;
     }
 
     /* ── Desktop / tablet ancho (≥ 768px) ── */
     @media (min-width: 768px) {
-      header  { padding: 18px 40px; }
-      footer  { padding: 14px 40px; }
-      main    { gap: 30px; }
-      .pills-row { max-width: 640px; }
-      .devices-row { gap: 16px; }
+      header {
+        padding: 18px 40px;
+      }
+
+      footer {
+        padding: 14px 40px;
+      }
+
+      main {
+        gap: 30px;
+      }
+
+      .pills-row {
+        max-width: 640px;
+      }
+
+      .devices-row {
+        gap: 16px;
+      }
     }
 
     /* ── Teléfono mediano (≤ 480px) ── */
@@ -1250,58 +1297,71 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       header {
         padding: 12px 14px;
       }
+
       .header-right {
         gap: 7px;
       }
+
       /* El badge de IP es redundante con el botón QR en móvil */
       .ip-badge {
         display: none;
       }
+
       main {
         gap: 14px;
       }
+
       /* Escalar el diamante sin romper animaciones */
       .drop-wrap {
         transform: scale(0.84);
         margin: -21px 0;
       }
+
       .devices-row {
         flex-wrap: wrap;
         justify-content: center;
         max-width: calc(100vw - 32px);
       }
+
       .pills-row {
         max-width: calc(100vw - 32px);
         padding: 4px 16px;
       }
+
       footer {
         padding: 10px 14px;
       }
+
       /* En móvil las stat chips ocupan espacio valioso */
       .footer-left {
         display: none;
       }
+
       .footer-nav {
         width: 100%;
         justify-content: center;
         flex-wrap: wrap;
         gap: 2px;
       }
+
       .footer-nav a {
         font-size: 0.65rem;
         padding: 4px 8px;
       }
+
       /* Paneles bottom-sheet a ancho completo */
       .text-box,
       .recv-box {
         padding: 18px 16px 28px;
         border-radius: 16px 16px 0 0;
       }
+
       .incoming-box {
         padding: 28px 18px 22px;
         max-width: 100%;
         border-radius: 20px;
       }
+
       /* Botones de acción más grandes para dedos */
       .btn-accept,
       .btn-reject {
@@ -1316,14 +1376,17 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         transform: scale(0.72);
         margin: -37px 0;
       }
+
       /* placeholder (my-badge eliminado) */
       ._unused {
         display: none;
       }
+
       .ctrl-btn {
         width: 26px;
         height: 26px;
       }
+
       .add-btn {
         width: 38px;
         height: 38px;
@@ -1335,16 +1398,20 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       main {
         gap: 8px;
       }
+
       .drop-wrap {
         transform: scale(0.65);
         margin: -46px 0;
       }
+
       .hint-text {
         display: none;
       }
+
       .hint-block {
         gap: 6px;
       }
+
       footer {
         padding: 8px 16px;
       }
@@ -1354,6 +1421,7 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       .devices-label {
         display: none;
       }
+
       .drop-wrap {
         transform: scale(0.55);
         margin: -59px 0;
@@ -1361,10 +1429,19 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
     }
 
     @media (prefers-reduced-motion: reduce) {
-      .diamond, .diamond-outer, .orbit-dot, .orbit-dot2, .scan-sweep, .icon-box,
-      .incoming-from, .incoming-file-icon, .incoming-arrow-icon {
+
+      .diamond,
+      .diamond-outer,
+      .orbit-dot,
+      .orbit-dot2,
+      .scan-sweep,
+      .icon-box,
+      .incoming-from,
+      .incoming-file-icon,
+      .incoming-arrow-icon {
         animation: none !important;
       }
+
       * {
         transition-duration: 0.01ms !important;
         animation-duration: 0.01ms !important;
@@ -1374,8 +1451,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 </head>
 
 <body>
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PCHSMJT6"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PCHSMJT6" height="0" width="0"
+      style="display:none;visibility:hidden"></iframe></noscript>
 
   <header>
     <div class="logo">InstantDrop</div>
@@ -1384,7 +1461,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       <button class="lang-btn" id="lang-btn" onclick="toggleLang()">EN</button>
       <button class="ctrl-btn" onclick="openQR()" title="QR" aria-label="Mostrar código QR">⊞</button>
       <button class="ctrl-btn" onclick="openText()" title="Compartir texto" aria-label="Compartir texto">¶</button>
-      <button class="ctrl-btn accent" id="add-btn-header" onclick="onAddClick()" title="Enviar" aria-label="Enviar archivo">+</button>
+      <button class="ctrl-btn accent" id="add-btn-header" onclick="onAddClick()" title="Enviar"
+        aria-label="Enviar archivo">+</button>
     </div>
   </header>
 
@@ -1412,7 +1490,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
 
     <!-- Hint + botón agregar -->
     <div class="hint-block">
-      <span class="hint-text"><span id="hint-static" data-i18n="app.choose_device">elige un dispositivo</span> · <span id="hint-text-link" style="color:var(--accent);opacity:0.7;cursor:pointer" onclick="openText()" data-i18n="app.text_link">Texto ¶</span></span>
+      <span class="hint-text"><span id="hint-static" data-i18n="app.choose_device">elige un dispositivo</span> · <span
+          id="hint-text-link" style="color:var(--accent);opacity:0.7;cursor:pointer" onclick="openText()"
+          data-i18n="app.text_link">Texto ¶</span></span>
       <button class="add-btn" id="add-btn" onclick="onAddClick()" aria-label="Enviar archivo">+</button>
     </div>
 
@@ -1480,15 +1560,17 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <span class="text-box-title" id="text-panel-title">enviar texto</span>
         <button class="btn-close" style="width:auto;padding:4px 10px;font-size:0.75rem" onclick="closeText()">✕</button>
       </div>
-      <textarea id="text-input" class="text-area" placeholder="escribe o pega el texto aquí…" data-i18n-ph="app.text_placeholder" maxlength="10000"
-        rows="4"></textarea>
+      <textarea id="text-input" class="text-area" placeholder="escribe o pega el texto aquí…"
+        data-i18n-ph="app.text_placeholder" maxlength="10000" rows="4"></textarea>
       <div style="display:flex;justify-content:flex-end">
         <span id="text-counter" style="font-family:'DM Mono',monospace;font-size:0.65rem;color:var(--muted)">0 /
           10000</span>
       </div>
       <div class="text-actions">
-        <button class="btn-close" style="flex:none;width:auto;padding:10px 18px" onclick="closeText()" data-i18n="app.cancel">cancelar</button>
-        <button class="btn-send" id="text-send-btn" onclick="submitText()" data-i18n="app.send_to_net">enviar a la red</button>
+        <button class="btn-close" style="flex:none;width:auto;padding:10px 18px" onclick="closeText()"
+          data-i18n="app.cancel">cancelar</button>
+        <button class="btn-send" id="text-send-btn" onclick="submitText()" data-i18n="app.send_to_net">enviar a la
+          red</button>
       </div>
     </div>
   </div>
@@ -1502,7 +1584,8 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
         <span class="incoming-file-icon" id="incoming-file-icon">📁</span>
       </div>
       <div class="incoming-title" data-i18n="app.incoming_title">¡te llegó algo!</div>
-      <div class="incoming-vibe" id="incoming-vibe" data-i18n="app.incoming_vibe_default">vaya a saber qué es esto 🎲</div>
+      <div class="incoming-vibe" id="incoming-vibe" data-i18n="app.incoming_vibe_default">vaya a saber qué es esto 🎲
+      </div>
       <div class="incoming-name" id="incoming-name">archivo</div>
       <div class="incoming-size" id="incoming-size">—</div>
       <div class="incoming-actions">
@@ -2106,9 +2189,9 @@ j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
       const files = pendingFiles.get(peerId) || [];
       pendingFiles.delete(peerId);
 
-      const CHUNK      = 256 * 1024;      // 256 KB per chunk
+      const CHUNK = 256 * 1024;      // 256 KB per chunk
       const HIGH_WATER = 4 * 1024 * 1024; // pause if buffer > 4 MB
-      const LOW_WATER  = 512 * 1024;      // resume at 512 KB
+      const LOW_WATER = 512 * 1024;      // resume at 512 KB
       dc.bufferedAmountLowThreshold = LOW_WATER;
 
       for (const file of files) {
