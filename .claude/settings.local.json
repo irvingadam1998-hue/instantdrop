@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:github.com)",
-      "Bash(npm uninstall:*)"
+      "Bash(npm uninstall:*)",
+      "Bash(npm install:*)",
+      "WebFetch(domain:countapi.mileshilliard.com)"
     ]
   }
 }

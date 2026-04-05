@@ -1,7 +1,9 @@
+require('dotenv').config();
 const express      = require('express');
 const qrcode       = require('qrcode');
 const path         = require('path');
 const os           = require('os');
+const fs           = require('fs');
 const { randomBytes } = require('crypto'); // built-in de Node.js, sin instalar nada
 
 const app  = express();
@@ -115,16 +117,58 @@ setInterval(() => {
 
 app.use(express.json());
 
-// Security headers básicos
+// Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
   res.setHeader('X-XSS-Protection', '1; mode=block');
   res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  res.setHeader(
+    'Content-Security-Policy',
+    [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://pagead2.googlesyndication.com https://gc.zgo.at https://www.google-analytics.com",
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+      "font-src https://fonts.gstatic.com",
+      "img-src 'self' data: https:",
+      "connect-src 'self' https://ivasquez.goatcounter.com https://www.google-analytics.com https://region1.google-analytics.com",
+      "frame-src https://googleads.g.doubleclick.net https://tpc.googlesyndication.com",
+      "object-src 'none'",
+      "base-uri 'self'"
+    ].join('; ')
+  );
   next();
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+// Inject window.__PROD__ into every HTML page so tracking scripts only run in production
+const publicDir = path.join(__dirname, 'public');
+const htmlCache = {};
+['index.html', 'about.html', 'help.html', 'privacy.html'].forEach(f => {
+  htmlCache[f] = fs.readFileSync(path.join(publicDir, f), 'utf8');
+});
+
+function serveHtml(file) {
+  return (req, res) => {
+    const isProd = !!process.env.RAILWAY_PUBLIC_DOMAIN;
+    const html   = htmlCache[file].replace(
+      '<meta charset="UTF-8">',
+      `<meta charset="UTF-8"><script>window.__PROD__=${isProd}</script>`
+    );
+    res.type('html').send(html);
+  };
+}
+
+app.get('/',              serveHtml('index.html'));
+app.get('/about.html',    serveHtml('about.html'));
+app.get('/help.html',     serveHtml('help.html'));
+app.get('/privacy.html',  serveHtml('privacy.html'));
+
+app.use(express.static(publicDir));
 
 // ── Dispositivos ──
 app.post('/api/register', rateLimit(20, 60_000), (req, res) => {
@@ -265,7 +309,7 @@ app.get('/api/qr', async (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
   const ip     = getLocalIP();
   const subnet = ip.split('.').slice(0, 3).join('.');
-  console.log('\n WiFi Share corriendo');
+  console.log('\n InstantDrop corriendo');
   console.log(` Red:    http://${ip}:${PORT}`);
   console.log(` Subred: ${subnet}.x`);
   console.log(' Archivos van P2P — servidor no guarda nada en RAM\n');

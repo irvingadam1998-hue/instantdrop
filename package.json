@@ -1,5 +1,5 @@
 {
-  "name": "wifi-share",
+  "name": "instantdrop",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -10,6 +10,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^17.4.1",
     "express": "^5.2.1",
     "qrcode": "^1.5.4"
   }
