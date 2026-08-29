@@ -1875,7 +1875,11 @@
     let myDeviceId = localStorage.getItem('InstantDrop-deviceId');
     let myToken = localStorage.getItem('InstantDrop-token');
     let myEmoji = localStorage.getItem('InstantDrop-emoji') || '··';
-    let myRoomId = localStorage.getItem('InstantDrop-roomId') || '';
+    const defaultRoomId = (() => {
+      const host = (window.location.hostname || 'instantdrop').replace(/^www\./i, '').replace(/[^a-z0-9]/gi, '').toUpperCase();
+      return host ? `AUTO-${host.slice(0, 18)}` : 'AUTO-INSTANTDROP';
+    })();
+    let myRoomId = normalizeRoomId(localStorage.getItem('InstantDrop-roomId')) || defaultRoomId;
     let selectedId = null;
     let isBusy = false;
     window.dataLayer = window.dataLayer || [];
@@ -1889,7 +1893,7 @@
       if (roomInput) {
         roomInput.value = myRoomId;
         roomInput.addEventListener('change', () => {
-          myRoomId = normalizeRoomId(roomInput.value);
+          myRoomId = normalizeRoomId(roomInput.value) || defaultRoomId;
           localStorage.setItem('InstantDrop-roomId', myRoomId);
           register();
           loadDevices();
