@@ -162,6 +162,25 @@
       transition: color 0.15s;
     }
 
+    .room-input {
+      width: 120px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 7px 12px;
+      font: inherit;
+      font-size: 0.72rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      outline: none;
+    }
+
+    .room-input:focus {
+      border-color: rgba(203, 255, 71, 0.55);
+      box-shadow: 0 0 0 3px rgba(203, 255, 71, 0.1);
+    }
+
     .ip-badge:hover {
       color: var(--text);
     }
@@ -1535,6 +1554,7 @@
   <header>
     <div class="logo">InstantDrop</div>
     <div class="header-right">
+      <input class="room-input" id="room-input" type="text" maxlength="24" placeholder="ROOM" aria-label="Room code" />
       <div class="ip-badge" id="ip-badge" onclick="openQR()">···</div>
       <button class="lang-btn" id="lang-btn" onclick="toggleLang()">EN</button>
       <button class="ctrl-btn" onclick="openQR()" title="QR" aria-label="Mostrar código QR">⊞</button>
@@ -1855,9 +1875,28 @@
     let myDeviceId = localStorage.getItem('InstantDrop-deviceId');
     let myToken = localStorage.getItem('InstantDrop-token');
     let myEmoji = localStorage.getItem('InstantDrop-emoji') || '··';
+    let myRoomId = localStorage.getItem('InstantDrop-roomId') || '';
     let selectedId = null;
     let isBusy = false;
     window.dataLayer = window.dataLayer || [];
+
+    function normalizeRoomId(raw) {
+      return (raw || '').toString().trim().toUpperCase().replace(/[^A-Z0-9-_]/g, '').slice(0, 24);
+    }
+
+    function syncRoomInput() {
+      const roomInput = document.getElementById('room-input');
+      if (roomInput) {
+        roomInput.value = myRoomId;
+        roomInput.addEventListener('change', () => {
+          myRoomId = normalizeRoomId(roomInput.value);
+          localStorage.setItem('InstantDrop-roomId', myRoomId);
+          register();
+          loadDevices();
+          connectEvents();
+        });
+      }
+    }
 
     function track(eventName, params = {}) {
       window.dataLayer.push({
@@ -1877,18 +1916,28 @@
 
     // ── Registro ──
     async function register() {
+      const payload = {
+        deviceId: myDeviceId,
+        token: myToken,
+        roomId: myRoomId || undefined
+      };
+
       const res = await fetch('/api/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ deviceId: myDeviceId, token: myToken })
+        body: JSON.stringify(payload)
       }).then(r => r.json());
 
       myDeviceId = res.deviceId;
       myToken = res.token;
       myEmoji = res.emoji;
+      myRoomId = normalizeRoomId(res.roomId || myRoomId);
       localStorage.setItem('InstantDrop-deviceId', myDeviceId);
       localStorage.setItem('InstantDrop-token', myToken);
       localStorage.setItem('InstantDrop-emoji', myEmoji);
+      localStorage.setItem('InstantDrop-roomId', myRoomId);
+      const roomInput = document.getElementById('room-input');
+      if (roomInput) roomInput.value = myRoomId;
       const myEmojiEl = document.getElementById('my-emoji');
       if (myEmojiEl) myEmojiEl.textContent = myEmoji;
     }
@@ -1900,7 +1949,7 @@
         const res = await fetch('/api/heartbeat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ deviceId: myDeviceId, token: myToken })
+          body: JSON.stringify({ deviceId: myDeviceId, token: myToken, roomId: myRoomId || undefined })
         }).then(r => r.json());
         if (!res.ok) {
           await register();
@@ -1928,7 +1977,10 @@
 
     // ── Dispositivos ──
     async function loadDevices() {
-      const devs = await fetch(`/api/devices?me=${myDeviceId}`).then(r => r.json());
+      const url = new URL('/api/devices', window.location.origin);
+      url.searchParams.set('me', myDeviceId || '');
+      if (myRoomId) url.searchParams.set('roomId', myRoomId);
+      const devs = await fetch(url.toString()).then(r => r.json());
       renderDevices(devs);
     }
 
@@ -2106,7 +2158,11 @@
     let _esDelay = 3000; // backoff: 3s → 6s → 12s → máx 20s
     function connectEvents() {
       if (_es) { _es.close(); _es = null; }
-      const es = new EventSource(`/api/events?deviceId=${myDeviceId}&token=${myToken}`);
+      const url = new URL('/api/events', window.location.origin);
+      url.searchParams.set('deviceId', myDeviceId || '');
+      url.searchParams.set('token', myToken || '');
+      if (myRoomId) url.searchParams.set('roomId', myRoomId);
+      const es = new EventSource(url.toString());
       _es = es;
       es.onopen = () => { _esDelay = 3000; }; // resetear backoff al conectar
       es.onmessage = async (e) => {
@@ -2189,7 +2245,7 @@
       await fetch('/api/signal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to, from: myDeviceId, token: myToken, type, data })
+        body: JSON.stringify({ to, from: myDeviceId, token: myToken, type, data, roomId: myRoomId || undefined })
       });
     }
 
@@ -2542,7 +2598,7 @@
       const res = await fetch('/api/clips', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text })
+        body: JSON.stringify({ text, roomId: myRoomId || undefined })
       }).then(r => r.json());
       if (res.error) { toast(res.error); return; }
       track('clip_shared', { text_length: text.length });
@@ -2551,7 +2607,9 @@
     });
 
     async function loadAll() {
-      const clips = await fetch('/api/clips').then(r => r.json());
+      const url = new URL('/api/clips', window.location.origin);
+      if (myRoomId) url.searchParams.set('roomId', myRoomId);
+      const clips = await fetch(url.toString()).then(r => r.json());
       renderClips(clips);
     }
 
@@ -2583,7 +2641,9 @@
       });
     }
     async function deleteClip(id) {
-      await fetch(`/api/clips/${id}`, { method: 'DELETE' });
+      const url = new URL(`/api/clips/${id}`, window.location.origin);
+      if (myRoomId) url.searchParams.set('roomId', myRoomId);
+      await fetch(url.toString(), { method: 'DELETE' });
       track('clip_deleted');
       loadAll();
     }
@@ -2662,6 +2722,7 @@
 
     // ── Init ──
     applyLang(_lang); // Apply saved language on load
+    syncRoomInput();
     (async () => {
       await register();
       await loadQR();

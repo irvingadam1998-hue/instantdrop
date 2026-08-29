@@ -60,9 +60,20 @@ function getClientIP(req) {
 
 // Buscar un dispositivo en todos los rooms → devuelve { device, subnet } o null
 function findDevice(deviceId) {
-  for (const [subnet, room] of rooms.entries())
-    if (room.has(deviceId)) return { device: room.get(deviceId), subnet };
+  for (const [roomKey, room] of rooms.entries())
+    if (room.has(deviceId)) return { device: room.get(deviceId), roomKey, subnet: room.get(deviceId).subnet };
   return null;
+}
+
+function normalizeRoomId(raw) {
+  const value = (raw || '').toString().trim().toUpperCase().replace(/[^A-Z0-9-_]/g, '').slice(0, 24);
+  return value || null;
+}
+
+function getRoomKey(req, roomId) {
+  const normalized = normalizeRoomId(roomId);
+  if (normalized) return `room:${normalized}`;
+  return `lan:${clientSubnet(req)}`;
 }
 
 // Rate limiting simple sin dependencias externas
@@ -185,8 +196,9 @@ app.use(express.static(publicDir));
 
 // ── Dispositivos ──
 app.post('/api/register', rateLimit(20, 60_000), (req, res) => {
-  const subnet = clientSubnet(req);
-  const room   = getRoom(subnet);
+  const roomId = req.body && req.body.roomId;
+  const roomKey = getRoomKey(req, roomId);
+  const room = getRoom(roomKey);
   const { deviceId: existing, token: existingToken } = req.body || {};
 
   // Re-registro: validar que el token coincida antes de renovar
@@ -194,7 +206,8 @@ app.post('/api/register', rateLimit(20, 60_000), (req, res) => {
     const d = room.get(existing);
     if (d.token !== existingToken) return res.status(403).json({ error: 'Token inválido' });
     d.lastSeen = Date.now();
-    return res.json({ deviceId: existing, emoji: d.emoji, token: d.token });
+    const explicitRoomId = normalizeRoomId(roomId);
+    return res.json({ deviceId: existing, emoji: d.emoji, token: d.token, roomId: explicitRoomId || null });
   }
 
   const deviceId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -203,14 +216,14 @@ app.post('/api/register', rateLimit(20, 60_000), (req, res) => {
   const pool     = EMOJIS.filter(e => !used.has(e));
   const emoji    = (pool.length ? pool : EMOJIS)[Math.floor(Math.random() * (pool.length || EMOJIS.length))];
 
-  room.set(deviceId, { id: deviceId, emoji, token, subnet, lastSeen: Date.now() });
-  res.json({ deviceId, emoji, token });
+  room.set(deviceId, { id: deviceId, emoji, token, subnet: clientSubnet(req), roomKey, lastSeen: Date.now() });
+  res.json({ deviceId, emoji, token, roomId: normalizeRoomId(roomId) || null });
 });
 
 app.post('/api/heartbeat', (req, res) => {
-  const subnet = clientSubnet(req);
+  const roomKey = getRoomKey(req, req.body && req.body.roomId);
   const { deviceId, token } = req.body || {};
-  const d = getRoom(subnet).get(deviceId);
+  const d = getRoom(roomKey).get(deviceId);
   if (d && d.token === token) {
     d.lastSeen = Date.now();
     return res.json({ ok: true });
@@ -220,10 +233,10 @@ app.post('/api/heartbeat', (req, res) => {
 });
 
 app.get('/api/devices', (req, res) => {
-  const subnet = clientSubnet(req);
+  const roomKey = getRoomKey(req, req.query.roomId);
   const { me }  = req.query;
   const now     = Date.now();
-  const list    = [...getRoom(subnet).values()]
+  const list    = [...getRoom(roomKey).values()]
     .filter(d => d.id !== me && now - d.lastSeen < TIMEOUT)
     .map(({ id, emoji }) => ({ id, emoji }));
   res.json(list);
@@ -261,17 +274,19 @@ app.get('/api/events', (req, res) => {
 });
 
 app.post('/api/signal', rateLimit(60, 10_000), (req, res) => {
-  const { to, from, token, type, data } = req.body;
+  const { to, from, token, type, data, roomId } = req.body;
 
   // 1. Verificar que el emisor existe y su token es válido
   const senderInfo = findDevice(from);
   if (!senderInfo || senderInfo.device.token !== token)
     return res.status(403).json({ error: 'No autorizado' });
 
-  // 2. Verificar que el destino está en la MISMA red (mismo room)
-  const targetRoom = getRoom(senderInfo.subnet);
+  const senderRoomKey = roomId ? getRoomKey(req, roomId) : senderInfo.roomKey;
+
+  // 2. Verificar que el destino está en la MISMA sala o en la misma red local como fallback
+  const targetRoom = getRoom(senderRoomKey);
   if (!targetRoom.has(to))
-    return res.status(403).json({ error: 'Dispositivo fuera de tu red' });
+    return res.status(403).json({ error: 'Dispositivo fuera de tu sala' });
 
   const target = sseClients.get(to);
   if (target) {
@@ -288,15 +303,17 @@ app.post('/api/signal', rateLimit(60, 10_000), (req, res) => {
 const MAX_CLIPS_PER_SUBNET = 100;
 
 app.get('/api/clips', (req, res) => {
-  const clips = getRoomClips(clientSubnet(req));
+  const roomKey = getRoomKey(req, req.query.roomId);
+  const clips = getRoomClips(roomKey);
   res.json([...clips.values()].map(({ id, text, mtime }) => ({ id, text, mtime })));
 });
 
 app.post('/api/clips', rateLimit(30, 60_000), (req, res) => {
+  const roomKey = getRoomKey(req, req.body.roomId);
   const text = (req.body.text || '').trim();
   if (!text) return res.status(400).json({ error: 'Texto vacío' });
   if (text.length > 10000) return res.status(400).json({ error: 'Texto muy largo' });
-  const clips = getRoomClips(clientSubnet(req));
+  const clips = getRoomClips(roomKey);
   if (clips.size >= MAX_CLIPS_PER_SUBNET) return res.status(429).json({ error: 'Límite de clips alcanzado' });
   const id    = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
   clips.set(id, { id, text, mtime: new Date() });
@@ -304,7 +321,8 @@ app.post('/api/clips', rateLimit(30, 60_000), (req, res) => {
 });
 
 app.delete('/api/clips/:id', rateLimit(30, 60_000), (req, res) => {
-  const clips = getRoomClips(clientSubnet(req));
+  const roomKey = getRoomKey(req, req.query.roomId);
+  const clips = getRoomClips(roomKey);
   if (!clips.has(req.params.id)) return res.status(404).json({ error: 'Not found' });
   clips.delete(req.params.id);
   res.json({ ok: true });
