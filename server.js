@@ -73,6 +73,14 @@ function normalizeRoomId(raw) {
 function getRoomKey(req, roomId) {
   const normalized = normalizeRoomId(roomId);
   if (normalized) return `room:${normalized}`;
+
+  const host = (req.headers.host || '').split(':')[0].toLowerCase();
+  const isLocalHost = !host || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(host);
+  if (!isLocalHost) {
+    const siteKey = host.replace(/^www\./, '').replace(/[^a-z0-9]/g, '').slice(0, 18).toUpperCase();
+    if (siteKey) return `room:AUTO-${siteKey}`;
+  }
+
   return `lan:${clientSubnet(req)}`;
 }
 
