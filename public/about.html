@@ -8,6 +8,8 @@
   <meta name="description"
     content="InstantDrop es una herramienta gratuita para compartir archivos y texto entre dispositivos en la misma red WiFi, sin cables, sin cuentas, sin límites de almacenamiento en la nube.">
   <link rel="canonical" href="https://instantdrop.site/about.html">
+  {{ROBOTS_META}}
+  <link rel="icon" href="/favicon.ico">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
@@ -38,8 +40,9 @@
   </script>
   <script>
     if (window.__PROD__) {
-      (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-PCHSMJT6');
+      // Servicios externos: se cargan solo en producción.
       var ads=document.createElement('script');ads.async=true;ads.crossOrigin='anonymous';ads.src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7739241937608835';document.head.appendChild(ads);
+      (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-PCHSMJT6');
       var gc=document.createElement('script');gc.async=true;gc.dataset.goatcounter='https://ivasquez.goatcounter.com/count';gc.src='//gc.zgo.at/count.js';document.head.appendChild(gc);
     }
   </script>
@@ -275,19 +278,6 @@
       opacity: 0.85;
     }
 
-    /* Ad slot */
-    .ad-slot {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 8px;
-      margin: 40px 0;
-      min-height: 100px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
     footer {
       border-top: 1px solid var(--border);
       padding: 20px 24px;
@@ -343,13 +333,6 @@
       que esté en la misma red WiFi. No requiere instalar nada, no necesita cuenta, y tus archivos
       nunca pasan por ningún servidor externo.
     </p>
-
-    <!-- Ad -->
-    <div class="ad-slot">
-      <ins class="adsbygoogle" style="display:block;width:100%;min-height:90px" data-ad-client="ca-pub-7739241937608835"
-        data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
-      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-    </div>
 
     <div class="section">
       <h2 data-i18n="about.features.title">¿Qué puedes hacer?</h2>
@@ -416,12 +399,6 @@
         sin internet, redes corporativas restringidas, o simplemente cuando quieres que tus archivos
         no pasen por servidores de terceros.
       </p>
-    </div>
-
-    <div class="ad-slot">
-      <ins class="adsbygoogle" style="display:block;width:100%;min-height:90px" data-ad-client="ca-pub-7739241937608835"
-        data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
-      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
     </div>
 
     <div class="cta-block">

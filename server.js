@@ -8,6 +8,11 @@ const { randomBytes } = require('crypto'); // built-in de Node.js, sin instalar 
 
 const app  = express();
 const PORT = process.env.PORT || 3000;
+// Única fuente de verdad para integraciones externas e indexación.
+// En el proveedor de hosting configura APP_ENV=production o NODE_ENV=production.
+const IS_PRODUCTION = ['production', 'prod'].includes(
+  (process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase()
+);
 
 const EMOJIS = [
   '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
@@ -51,7 +56,7 @@ function getLocalIP() {
 function getClientIP(req) {
   // Solo confiar en X-Forwarded-For si estamos en Railway (proxy conocido)
   // En local, cualquiera podría falsificar ese header
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+  if (IS_PRODUCTION && process.env.RAILWAY_PUBLIC_DOMAIN) {
     const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
     if (forwarded) return forwarded.replace(/^::ffff:/, '');
   }
@@ -165,7 +170,7 @@ const htmlCache = {};
 });
 
 function getAnalyticsSnippet() {
-  if (!process.env.VERCEL) return '';
+  if (!IS_PRODUCTION || !process.env.VERCEL) return '';
   return [
     '<script>',
     'window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };',
@@ -175,7 +180,7 @@ function getAnalyticsSnippet() {
 }
 
 function getSpeedInsightsSnippet() {
-  if (!process.env.VERCEL) return '';
+  if (!IS_PRODUCTION || !process.env.VERCEL) return '';
   return [
     '<script>',
     'window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };',
@@ -186,11 +191,12 @@ function getSpeedInsightsSnippet() {
 
 function serveHtml(file) {
   return (req, res) => {
-    const isProd = !!process.env.RAILWAY_PUBLIC_DOMAIN;
-    const html   = htmlCache[file].replace(
-      '<meta charset="UTF-8">',
-      `<meta charset="UTF-8"><script>window.__PROD__=${isProd}</script>${getAnalyticsSnippet()}${getSpeedInsightsSnippet()}`
-    );
+    const robotsMeta = IS_PRODUCTION
+      ? '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">'
+      : '<meta name="robots" content="noindex,nofollow,noarchive">';
+    const html = htmlCache[file]
+      .replace('<meta charset="UTF-8">', `<meta charset="UTF-8"><script>window.__PROD__=${IS_PRODUCTION}</script>${getAnalyticsSnippet()}${getSpeedInsightsSnippet()}`)
+      .replace('{{ROBOTS_META}}', robotsMeta);
     res.type('html').send(html);
   };
 }
@@ -199,6 +205,16 @@ app.get('/',              serveHtml('index.html'));
 app.get('/about.html',    serveHtml('about.html'));
 app.get('/help.html',     serveHtml('help.html'));
 app.get('/privacy.html',  serveHtml('privacy.html'));
+
+app.get('/robots.txt', (req, res) => {
+  if (!IS_PRODUCTION) return res.type('text/plain').send('User-agent: *\nDisallow: /\n');
+  res.type('text/plain').send(fs.readFileSync(path.join(publicDir, 'robots.txt'), 'utf8'));
+});
+
+app.get('/sitemap.xml', (req, res) => {
+  if (!IS_PRODUCTION) return res.status(404).end();
+  res.type('application/xml').send(fs.readFileSync(path.join(publicDir, 'sitemap.xml'), 'utf8'));
+});
 
 app.use(express.static(publicDir));
 

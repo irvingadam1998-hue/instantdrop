@@ -8,6 +8,8 @@
   <meta name="description"
     content="Política de privacidad de InstantDrop. Qué datos se recopilan, cómo se usan y cómo protegemos tu información.">
   <link rel="canonical" href="https://instantdrop.site/privacy.html">
+  {{ROBOTS_META}}
+  <link rel="icon" href="/favicon.ico">
 
   <!-- Open Graph -->
   <meta property="og:type" content="website">
@@ -32,8 +34,9 @@
   </script>
   <script>
     if (window.__PROD__) {
-      (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-PCHSMJT6');
+      // Servicios externos: se cargan solo en producción.
       var ads=document.createElement('script');ads.async=true;ads.crossOrigin='anonymous';ads.src='https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-7739241937608835';document.head.appendChild(ads);
+      (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer','GTM-PCHSMJT6');
       var gc=document.createElement('script');gc.async=true;gc.dataset.goatcounter='https://ivasquez.goatcounter.com/count';gc.src='//gc.zgo.at/count.js';document.head.appendChild(gc);
     }
   </script>
@@ -205,19 +208,6 @@
       margin-bottom: 0;
     }
 
-    /* Ad slot */
-    .ad-slot {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 8px;
-      margin: 40px 0;
-      min-height: 100px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
     footer {
       border-top: 1px solid var(--border);
       padding: 20px 24px;
@@ -302,12 +292,6 @@
       </ul>
     </div>
 
-    <div class="ad-slot">
-      <ins class="adsbygoogle" style="display:block;width:100%;min-height:90px" data-ad-client="ca-pub-7739241937608835"
-        data-ad-slot="auto" data-ad-format="auto" data-full-width-responsive="true"></ins>
-      <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-    </div>
-
     <div class="section">
       <h2 data-i18n="privacy.s2.title">2. Transferencia de archivos P2P</h2>
       <p data-i18n="privacy.s2.p1">
@@ -335,6 +319,7 @@
         pueden usar cookies u otras tecnologías similares para personalizar anuncios, limitar la frecuencia
         con la que se muestran y medir su rendimiento.
       </p>
+      <p>Puedes consultar <a href="https://policies.google.com/technologies/partner-sites" target="_blank" rel="noopener noreferrer" style="color:var(--accent)">cómo Google usa la información de sitios y aplicaciones asociados</a>.</p>
     </div>
 
     <div class="section">
