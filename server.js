@@ -189,27 +189,18 @@ setInterval(() => {
 
 app.use(express.json())
 
-// Middleware: Redirigir www a non-www y HTTP a HTTPS en producción
+// Middleware: Redirigir www a non-www
 app.use((req, res, next) => {
   let host = req.headers.host || ''
-  const proto = IS_PRODUCTION ? 'https' : req.protocol
-  let redirect = false
-  let newHost = host
-
+  
   // Eliminar www
   if (host.startsWith('www.')) {
-    newHost = host.slice(4)
-    redirect = true
-  }
-
-  // Redirigir a HTTPS en producción
-  if (IS_PRODUCTION && req.protocol === 'http') {
-    redirect = true
-  }
-
-  if (redirect) {
+    const newHost = host.slice(4)
+    // En producción con proxy, X-Forwarded-Proto indica el protocolo real
+    const proto = IS_PRODUCTION ? 'https' : req.protocol
     return res.redirect(301, `${proto}://${newHost}${req.originalUrl}`)
   }
+  
   next()
 })
 
