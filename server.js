@@ -1,371 +1,477 @@
-require('dotenv').config();
-const express      = require('express');
-const qrcode       = require('qrcode');
-const path         = require('path');
-const os           = require('os');
-const fs           = require('fs');
-const { randomBytes } = require('crypto'); // built-in de Node.js, sin instalar nada
+require('dotenv').config()
+const express = require('express')
+const qrcode = require('qrcode')
+const path = require('path')
+const os = require('os')
+const fs = require('fs')
+const { randomBytes } = require('crypto') // built-in de Node.js, sin instalar nada
 
-const app  = express();
-const PORT = process.env.PORT || 3000;
+const app = express()
+const PORT = process.env.PORT || 3000
 // Única fuente de verdad para integraciones externas e indexación.
 // En el proveedor de hosting configura APP_ENV=production o NODE_ENV=production.
 const IS_PRODUCTION = ['production', 'prod'].includes(
   (process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase()
-);
+)
 
 const EMOJIS = [
-  '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯',
-  '🦁','🐮','🐸','🐵','🐧','🐦','🦆','🦅','🦉','🦋',
-  '🐺','🐗','🐴','🦄','🐝','🐞','🐬','🐙','🦈','🦒'
-];
-const TIMEOUT = 30000;
+  '🐶',
+  '🐱',
+  '🐭',
+  '🐹',
+  '🐰',
+  '🦊',
+  '🐻',
+  '🐼',
+  '🐨',
+  '🐯',
+  '🦁',
+  '🐮',
+  '🐸',
+  '🐵',
+  '🐧',
+  '🐦',
+  '🦆',
+  '🦅',
+  '🦉',
+  '🦋',
+  '🐺',
+  '🐗',
+  '🐴',
+  '🦄',
+  '🐝',
+  '🐞',
+  '🐬',
+  '🐙',
+  '🦈',
+  '🦒',
+]
+const TIMEOUT = 30000
 
-const rooms          = new Map(); // subnet → Map(deviceId → device)
-const roomClips      = new Map(); // subnet → Map(id → clip)
-const sseClients     = new Map(); // deviceId → res  ← solo para señalización WebRTC
-const pendingSignals = new Map(); // deviceId → [{from,type,data,ts}] señales en espera
+const rooms = new Map() // subnet → Map(deviceId → device)
+const roomClips = new Map() // subnet → Map(id → clip)
+const sseClients = new Map() // deviceId → res  ← solo para señalización WebRTC
+const pendingSignals = new Map() // deviceId → [{from,type,data,ts}] señales en espera
 
 // Limpiar señales en espera viejas cada 60s
 setInterval(() => {
-  const cutoff = Date.now() - 30000;
+  const cutoff = Date.now() - 30000
   for (const [id, sigs] of pendingSignals.entries()) {
-    const fresh = sigs.filter(s => s.ts > cutoff);
-    if (fresh.length) pendingSignals.set(id, fresh);
-    else pendingSignals.delete(id);
+    const fresh = sigs.filter((s) => s.ts > cutoff)
+    if (fresh.length) pendingSignals.set(id, fresh)
+    else pendingSignals.delete(id)
   }
-}, 60000);
+}, 60000)
 
 // ── Helpers ──
 function getLocalIP() {
-  const ifaces = os.networkInterfaces();
-  const skip   = /virtual|vmware|vbox|hyper|vethernet|loopback|bluetooth|tunnel|tap|tun/i;
-  const prefer = /wi.?fi|wlan|wireless/i;
-  let fallback = null;
+  const ifaces = os.networkInterfaces()
+  const skip =
+    /virtual|vmware|vbox|hyper|vethernet|loopback|bluetooth|tunnel|tap|tun/i
+  const prefer = /wi.?fi|wlan|wireless/i
+  let fallback = null
   for (const [name, addrs] of Object.entries(ifaces)) {
-    if (skip.test(name)) continue;
+    if (skip.test(name)) continue
     for (const addr of addrs) {
-      if (addr.family !== 'IPv4' || addr.internal) continue;
-      if (prefer.test(name)) return addr.address;
-      if (!fallback) fallback = addr.address;
+      if (addr.family !== 'IPv4' || addr.internal) continue
+      if (prefer.test(name)) return addr.address
+      if (!fallback) fallback = addr.address
     }
   }
-  return fallback || '127.0.0.1';
+  return fallback || '127.0.0.1'
 }
 
 function getClientIP(req) {
   // Solo confiar en X-Forwarded-For si estamos en Railway (proxy conocido)
   // En local, cualquiera podría falsificar ese header
   if (IS_PRODUCTION && process.env.RAILWAY_PUBLIC_DOMAIN) {
-    const forwarded = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-    if (forwarded) return forwarded.replace(/^::ffff:/, '');
+    const forwarded = (req.headers['x-forwarded-for'] || '')
+      .split(',')[0]
+      .trim()
+    if (forwarded) return forwarded.replace(/^::ffff:/, '')
   }
-  return (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  return (req.socket.remoteAddress || '').replace(/^::ffff:/, '')
 }
 
 // Buscar un dispositivo en todos los rooms → devuelve { device, subnet } o null
 function findDevice(deviceId) {
   for (const [roomKey, room] of rooms.entries())
-    if (room.has(deviceId)) return { device: room.get(deviceId), roomKey, subnet: room.get(deviceId).subnet };
-  return null;
+    if (room.has(deviceId))
+      return {
+        device: room.get(deviceId),
+        roomKey,
+        subnet: room.get(deviceId).subnet,
+      }
+  return null
 }
 
 function normalizeRoomId(raw) {
-  const value = (raw || '').toString().trim().toUpperCase().replace(/[^A-Z0-9-_]/g, '').slice(0, 24);
-  return value || null;
+  const value = (raw || '')
+    .toString()
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9-_]/g, '')
+    .slice(0, 24)
+  return value || null
 }
 
 function getRoomKey(req, roomId) {
-  const normalized = normalizeRoomId(roomId);
-  if (normalized) return `room:${normalized}`;
+  const normalized = normalizeRoomId(roomId)
+  if (normalized) return `room:${normalized}`
 
-  const host = (req.headers.host || '').split(':')[0].toLowerCase();
-  const isLocalHost = !host || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(host);
+  const host = (req.headers.host || '').split(':')[0].toLowerCase()
+  const isLocalHost =
+    !host || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(host)
   if (!isLocalHost) {
-    const siteKey = host.replace(/^www\./, '').replace(/[^a-z0-9]/g, '').slice(0, 18).toUpperCase();
-    if (siteKey) return `room:AUTO-${siteKey}`;
+    const siteKey = host
+      .replace(/^www\./, '')
+      .replace(/[^a-z0-9]/g, '')
+      .slice(0, 18)
+      .toUpperCase()
+    if (siteKey) return `room:AUTO-${siteKey}`
   }
 
-  return `lan:${clientSubnet(req)}`;
+  return `lan:${clientSubnet(req)}`
 }
 
 // Rate limiting simple sin dependencias externas
 function rateLimit(max, windowMs) {
-  const _rl = new Map(); // Map propio por endpoint — evita contaminación cruzada
+  const _rl = new Map() // Map propio por endpoint — evita contaminación cruzada
   return (req, res, next) => {
-    const key = getClientIP(req);
-    const now = Date.now();
-    const entry = _rl.get(key);
-    if (!entry || now > entry.t) { _rl.set(key, { n: 1, t: now + windowMs }); return next(); }
-    if (entry.n >= max) return res.status(429).json({ error: 'Demasiadas solicitudes' });
-    entry.n++;
-    next();
-  };
+    const key = getClientIP(req)
+    const now = Date.now()
+    const entry = _rl.get(key)
+    if (!entry || now > entry.t) {
+      _rl.set(key, { n: 1, t: now + windowMs })
+      return next()
+    }
+    if (entry.n >= max)
+      return res.status(429).json({ error: 'Demasiadas solicitudes' })
+    entry.n++
+    next()
+  }
 }
 
 function isPrivateIP(ip) {
-  if (ip.startsWith('192.168.')) return true;
-  if (ip.startsWith('10.'))      return true;
+  if (ip.startsWith('192.168.')) return true
+  if (ip.startsWith('10.')) return true
   if (ip.startsWith('172.')) {
-    const n = parseInt(ip.split('.')[1]);
-    return n >= 16 && n <= 31;
+    const n = parseInt(ip.split('.')[1])
+    return n >= 16 && n <= 31
   }
-  return false;
+  return false
 }
 
 function clientSubnet(req) {
-  const ip = getClientIP(req);
+  const ip = getClientIP(req)
   if (ip === '127.0.0.1' || ip === '::1')
-    return getLocalIP().split('.').slice(0, 3).join('.');
-  if (isPrivateIP(ip))
-    return ip.split('.').slice(0, 3).join('.');
-  return ip; // IP pública: todos del mismo router comparten la misma
+    return getLocalIP().split('.').slice(0, 3).join('.')
+  if (isPrivateIP(ip)) return ip.split('.').slice(0, 3).join('.')
+  return ip // IP pública: todos del mismo router comparten la misma
 }
 
 function getRoom(subnet) {
-  if (!rooms.has(subnet)) rooms.set(subnet, new Map());
-  return rooms.get(subnet);
+  if (!rooms.has(subnet)) rooms.set(subnet, new Map())
+  return rooms.get(subnet)
 }
 function getRoomClips(subnet) {
-  if (!roomClips.has(subnet)) roomClips.set(subnet, new Map());
-  return roomClips.get(subnet);
+  if (!roomClips.has(subnet)) roomClips.set(subnet, new Map())
+  return roomClips.get(subnet)
 }
 
 // Limpiar dispositivos inactivos
 setInterval(() => {
-  const now = Date.now();
+  const now = Date.now()
   for (const devMap of rooms.values())
     for (const [id, d] of devMap.entries())
-      if (now - d.lastSeen > TIMEOUT) devMap.delete(id);
-}, 10000);
+      if (now - d.lastSeen > TIMEOUT) devMap.delete(id)
+}, 10000)
 
-app.use(express.json());
+app.use(express.json())
+
+// Middleware: Redirigir www a non-www y HTTP a HTTPS en producción
+app.use((req, res, next) => {
+  let host = req.headers.host || ''
+  const proto = IS_PRODUCTION ? 'https' : req.protocol
+  let redirect = false
+  let newHost = host
+
+  // Eliminar www
+  if (host.startsWith('www.')) {
+    newHost = host.slice(4)
+    redirect = true
+  }
+
+  // Redirigir a HTTPS en producción
+  if (IS_PRODUCTION && req.protocol === 'http') {
+    redirect = true
+  }
+
+  if (redirect) {
+    return res.redirect(301, `${proto}://${newHost}${req.originalUrl}`)
+  }
+  next()
+})
 
 // Security headers
 app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('X-XSS-Protection', '1; mode=block');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('X-XSS-Protection', '1; mode=block')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
+  res.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
   if (process.env.RAILWAY_PUBLIC_DOMAIN) {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader(
+      'Strict-Transport-Security',
+      'max-age=31536000; includeSubDomains'
+    )
   }
   res.setHeader(
     'Content-Security-Policy',
-    [
-      "object-src 'none'",
-      "base-uri 'self'"
-    ].join('; ')
-  );
-  next();
-});
+    ["object-src 'none'", "base-uri 'self'"].join('; ')
+  )
+  next()
+})
 
 // Inject window.__PROD__ into every HTML page so tracking scripts only run in production
-const publicDir = path.join(__dirname, 'public');
-const htmlCache = {};
-['index.html', 'about.html', 'help.html', 'privacy.html'].forEach(f => {
-  htmlCache[f] = fs.readFileSync(path.join(publicDir, f), 'utf8');
-});
+const publicDir = path.join(__dirname, 'public')
+const htmlCache = {}
+;['index.html', 'about.html', 'help.html', 'privacy.html'].forEach((f) => {
+  htmlCache[f] = fs.readFileSync(path.join(publicDir, f), 'utf8')
+})
 
 function getAnalyticsSnippet() {
-  if (!IS_PRODUCTION || !process.env.VERCEL) return '';
+  if (!IS_PRODUCTION || !process.env.VERCEL) return ''
   return [
     '<script>',
     'window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };',
     '</script>',
-    '<script defer src="/_vercel/insights/script.js"></script>'
-  ].join('');
+    '<script defer src="/_vercel/insights/script.js"></script>',
+  ].join('')
 }
 
 function getSpeedInsightsSnippet() {
-  if (!IS_PRODUCTION || !process.env.VERCEL) return '';
+  if (!IS_PRODUCTION || !process.env.VERCEL) return ''
   return [
     '<script>',
     'window.si = window.si || function () { (window.siq = window.siq || []).push(arguments); };',
     '</script>',
-    '<script defer src="/_vercel/speed-insights/script.js"></script>'
-  ].join('');
+    '<script defer src="/_vercel/speed-insights/script.js"></script>',
+  ].join('')
 }
 
 function serveHtml(file) {
   return (req, res) => {
     const robotsMeta = IS_PRODUCTION
       ? '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">'
-      : '<meta name="robots" content="noindex,nofollow,noarchive">';
+      : '<meta name="robots" content="noindex,nofollow,noarchive">'
     const html = htmlCache[file]
-      .replace('<meta charset="UTF-8">', `<meta charset="UTF-8"><script>window.__PROD__=${IS_PRODUCTION}</script>${getAnalyticsSnippet()}${getSpeedInsightsSnippet()}`)
-      .replace('{{ROBOTS_META}}', robotsMeta);
-    res.type('html').send(html);
-  };
+      .replace(
+        '<meta charset="UTF-8">',
+        `<meta charset="UTF-8"><script>window.__PROD__=${IS_PRODUCTION}</script>${getAnalyticsSnippet()}${getSpeedInsightsSnippet()}`
+      )
+      .replace('{{ROBOTS_META}}', robotsMeta)
+    res.type('html').send(html)
+  }
 }
 
-app.get('/',              serveHtml('index.html'));
-app.get('/about.html',    serveHtml('about.html'));
-app.get('/help.html',     serveHtml('help.html'));
-app.get('/privacy.html',  serveHtml('privacy.html'));
+app.get('/', serveHtml('index.html'))
+app.get('/about.html', serveHtml('about.html'))
+app.get('/help.html', serveHtml('help.html'))
+app.get('/privacy.html', serveHtml('privacy.html'))
 
 app.get('/robots.txt', (req, res) => {
-  if (!IS_PRODUCTION) return res.type('text/plain').send('User-agent: *\nDisallow: /\n');
-  res.type('text/plain').send(fs.readFileSync(path.join(publicDir, 'robots.txt'), 'utf8'));
-});
+  if (!IS_PRODUCTION)
+    return res.type('text/plain').send('User-agent: *\nDisallow: /\n')
+  res
+    .type('text/plain')
+    .send(fs.readFileSync(path.join(publicDir, 'robots.txt'), 'utf8'))
+})
 
 app.get('/sitemap.xml', (req, res) => {
-  if (!IS_PRODUCTION) return res.status(404).end();
-  res.type('application/xml').send(fs.readFileSync(path.join(publicDir, 'sitemap.xml'), 'utf8'));
-});
+  if (!IS_PRODUCTION) return res.status(404).end()
+  res
+    .type('application/xml')
+    .send(fs.readFileSync(path.join(publicDir, 'sitemap.xml'), 'utf8'))
+})
 
-app.use(express.static(publicDir));
+app.use(express.static(publicDir))
 
 // ── Dispositivos ──
 app.post('/api/register', rateLimit(20, 60_000), (req, res) => {
-  const roomId = req.body && req.body.roomId;
-  const roomKey = getRoomKey(req, roomId);
-  const room = getRoom(roomKey);
-  const { deviceId: existing, token: existingToken } = req.body || {};
+  const roomId = req.body && req.body.roomId
+  const roomKey = getRoomKey(req, roomId)
+  const room = getRoom(roomKey)
+  const { deviceId: existing, token: existingToken } = req.body || {}
 
   // Re-registro: validar que el token coincida antes de renovar
   if (existing && room.has(existing)) {
-    const d = room.get(existing);
-    if (d.token !== existingToken) return res.status(403).json({ error: 'Token inválido' });
-    d.lastSeen = Date.now();
-    const explicitRoomId = normalizeRoomId(roomId);
-    return res.json({ deviceId: existing, emoji: d.emoji, token: d.token, roomId: explicitRoomId || null });
+    const d = room.get(existing)
+    if (d.token !== existingToken)
+      return res.status(403).json({ error: 'Token inválido' })
+    d.lastSeen = Date.now()
+    const explicitRoomId = normalizeRoomId(roomId)
+    return res.json({
+      deviceId: existing,
+      emoji: d.emoji,
+      token: d.token,
+      roomId: explicitRoomId || null,
+    })
   }
 
-  const deviceId = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  const token    = randomBytes(24).toString('hex'); // secreto único por dispositivo
-  const used     = new Set([...room.values()].map(d => d.emoji));
-  const pool     = EMOJIS.filter(e => !used.has(e));
-  const emoji    = (pool.length ? pool : EMOJIS)[Math.floor(Math.random() * (pool.length || EMOJIS.length))];
+  const deviceId =
+    Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  const token = randomBytes(24).toString('hex') // secreto único por dispositivo
+  const used = new Set([...room.values()].map((d) => d.emoji))
+  const pool = EMOJIS.filter((e) => !used.has(e))
+  const emoji = (pool.length ? pool : EMOJIS)[
+    Math.floor(Math.random() * (pool.length || EMOJIS.length))
+  ]
 
-  room.set(deviceId, { id: deviceId, emoji, token, subnet: clientSubnet(req), roomKey, lastSeen: Date.now() });
-  res.json({ deviceId, emoji, token, roomId: normalizeRoomId(roomId) || null });
-});
+  room.set(deviceId, {
+    id: deviceId,
+    emoji,
+    token,
+    subnet: clientSubnet(req),
+    roomKey,
+    lastSeen: Date.now(),
+  })
+  res.json({ deviceId, emoji, token, roomId: normalizeRoomId(roomId) || null })
+})
 
 app.post('/api/heartbeat', (req, res) => {
-  const roomKey = getRoomKey(req, req.body && req.body.roomId);
-  const { deviceId, token } = req.body || {};
-  const d = getRoom(roomKey).get(deviceId);
+  const roomKey = getRoomKey(req, req.body && req.body.roomId)
+  const { deviceId, token } = req.body || {}
+  const d = getRoom(roomKey).get(deviceId)
   if (d && d.token === token) {
-    d.lastSeen = Date.now();
-    return res.json({ ok: true });
+    d.lastSeen = Date.now()
+    return res.json({ ok: true })
   }
   // El dispositivo expiró o el token no coincide — el cliente debe re-registrarse
-  res.json({ ok: false });
-});
+  res.json({ ok: false })
+})
 
 app.get('/api/devices', (req, res) => {
-  const roomKey = getRoomKey(req, req.query.roomId);
-  const { me }  = req.query;
-  const now     = Date.now();
-  const list    = [...getRoom(roomKey).values()]
-    .filter(d => d.id !== me && now - d.lastSeen < TIMEOUT)
-    .map(({ id, emoji }) => ({ id, emoji }));
-  res.json(list);
-});
+  const roomKey = getRoomKey(req, req.query.roomId)
+  const { me } = req.query
+  const now = Date.now()
+  const list = [...getRoom(roomKey).values()]
+    .filter((d) => d.id !== me && now - d.lastSeen < TIMEOUT)
+    .map(({ id, emoji }) => ({ id, emoji }))
+  res.json(list)
+})
 
 // ── Señalización WebRTC (SSE) ──
 // El servidor SOLO reenvía mensajes — nunca toca los archivos
 app.get('/api/events', (req, res) => {
-  const { deviceId, token } = req.query;
+  const { deviceId, token } = req.query
 
   // Validar que el dispositivo existe y el token es correcto
-  const found = findDevice(deviceId);
-  if (!found || found.device.token !== token) return res.status(403).end();
+  const found = findDevice(deviceId)
+  if (!found || found.device.token !== token) return res.status(403).end()
 
-  res.setHeader('Content-Type',      'text/event-stream');
-  res.setHeader('Cache-Control',     'no-cache');
-  res.setHeader('Connection',        'keep-alive');
-  res.setHeader('X-Accel-Buffering', 'no');
-  res.flushHeaders();
+  res.setHeader('Content-Type', 'text/event-stream')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('Connection', 'keep-alive')
+  res.setHeader('X-Accel-Buffering', 'no')
+  res.flushHeaders()
 
-  sseClients.set(deviceId, res);
+  sseClients.set(deviceId, res)
 
   // Entregar señales que llegaron antes de que este SSE estuviera listo
-  const queued = pendingSignals.get(deviceId);
+  const queued = pendingSignals.get(deviceId)
   if (queued) {
-    const now = Date.now();
+    const now = Date.now()
     for (const s of queued)
       if (now - s.ts < 30000)
-        res.write(`data: ${JSON.stringify({ from: s.from, type: s.type, data: s.data })}\n\n`);
-    pendingSignals.delete(deviceId);
+        res.write(
+          `data: ${JSON.stringify({ from: s.from, type: s.type, data: s.data })}\n\n`
+        )
+    pendingSignals.delete(deviceId)
   }
 
-  const ping = setInterval(() => res.write(': ping\n\n'), 25000);
-  req.on('close', () => { clearInterval(ping); sseClients.delete(deviceId); });
-});
+  const ping = setInterval(() => res.write(': ping\n\n'), 25000)
+  req.on('close', () => {
+    clearInterval(ping)
+    sseClients.delete(deviceId)
+  })
+})
 
 app.post('/api/signal', rateLimit(60, 10_000), (req, res) => {
-  const { to, from, token, type, data, roomId } = req.body;
+  const { to, from, token, type, data, roomId } = req.body
 
   // 1. Verificar que el emisor existe y su token es válido
-  const senderInfo = findDevice(from);
+  const senderInfo = findDevice(from)
   if (!senderInfo || senderInfo.device.token !== token)
-    return res.status(403).json({ error: 'No autorizado' });
+    return res.status(403).json({ error: 'No autorizado' })
 
-  const senderRoomKey = roomId ? getRoomKey(req, roomId) : senderInfo.roomKey;
+  const senderRoomKey = roomId ? getRoomKey(req, roomId) : senderInfo.roomKey
 
   // 2. Verificar que el destino está en la MISMA sala o en la misma red local como fallback
-  const targetRoom = getRoom(senderRoomKey);
+  const targetRoom = getRoom(senderRoomKey)
   if (!targetRoom.has(to))
-    return res.status(403).json({ error: 'Dispositivo fuera de tu sala' });
+    return res.status(403).json({ error: 'Dispositivo fuera de tu sala' })
 
-  const target = sseClients.get(to);
+  const target = sseClients.get(to)
   if (target) {
-    target.write(`data: ${JSON.stringify({ from, type, data })}\n\n`);
+    target.write(`data: ${JSON.stringify({ from, type, data })}\n\n`)
   } else {
     // Receptor aún no tiene SSE activo — encolar para entregar cuando conecte
-    if (!pendingSignals.has(to)) pendingSignals.set(to, []);
-    pendingSignals.get(to).push({ from, type, data, ts: Date.now() });
+    if (!pendingSignals.has(to)) pendingSignals.set(to, [])
+    pendingSignals.get(to).push({ from, type, data, ts: Date.now() })
   }
-  res.json({ ok: !!target });
-});
+  res.json({ ok: !!target })
+})
 
 // ── Clips de texto ──
-const MAX_CLIPS_PER_SUBNET = 100;
+const MAX_CLIPS_PER_SUBNET = 100
 
 app.get('/api/clips', (req, res) => {
-  const roomKey = getRoomKey(req, req.query.roomId);
-  const clips = getRoomClips(roomKey);
-  res.json([...clips.values()].map(({ id, text, mtime }) => ({ id, text, mtime })));
-});
+  const roomKey = getRoomKey(req, req.query.roomId)
+  const clips = getRoomClips(roomKey)
+  res.json(
+    [...clips.values()].map(({ id, text, mtime }) => ({ id, text, mtime }))
+  )
+})
 
 app.post('/api/clips', rateLimit(30, 60_000), (req, res) => {
-  const roomKey = getRoomKey(req, req.body.roomId);
-  const text = (req.body.text || '').trim();
-  if (!text) return res.status(400).json({ error: 'Texto vacío' });
-  if (text.length > 10000) return res.status(400).json({ error: 'Texto muy largo' });
-  const clips = getRoomClips(roomKey);
-  if (clips.size >= MAX_CLIPS_PER_SUBNET) return res.status(429).json({ error: 'Límite de clips alcanzado' });
-  const id    = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-  clips.set(id, { id, text, mtime: new Date() });
-  res.json({ ok: true, id });
-});
+  const roomKey = getRoomKey(req, req.body.roomId)
+  const text = (req.body.text || '').trim()
+  if (!text) return res.status(400).json({ error: 'Texto vacío' })
+  if (text.length > 10000)
+    return res.status(400).json({ error: 'Texto muy largo' })
+  const clips = getRoomClips(roomKey)
+  if (clips.size >= MAX_CLIPS_PER_SUBNET)
+    return res.status(429).json({ error: 'Límite de clips alcanzado' })
+  const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6)
+  clips.set(id, { id, text, mtime: new Date() })
+  res.json({ ok: true, id })
+})
 
 app.delete('/api/clips/:id', rateLimit(30, 60_000), (req, res) => {
-  const roomKey = getRoomKey(req, req.query.roomId);
-  const clips = getRoomClips(roomKey);
-  if (!clips.has(req.params.id)) return res.status(404).json({ error: 'Not found' });
-  clips.delete(req.params.id);
-  res.json({ ok: true });
-});
+  const roomKey = getRoomKey(req, req.query.roomId)
+  const clips = getRoomClips(roomKey)
+  if (!clips.has(req.params.id))
+    return res.status(404).json({ error: 'Not found' })
+  clips.delete(req.params.id)
+  res.json({ ok: true })
+})
 
 // ── QR ──
 app.get('/api/qr', async (req, res) => {
-  const host  = process.env.RAILWAY_PUBLIC_DOMAIN || `${getLocalIP()}:${PORT}`;
-  const proto = process.env.RAILWAY_PUBLIC_DOMAIN ? 'https' : 'http';
-  const url   = `${proto}://${host}`;
-  const qr    = await qrcode.toDataURL(url);
-  res.json({ url, qr });
-});
+  const host = process.env.RAILWAY_PUBLIC_DOMAIN || `${getLocalIP()}:${PORT}`
+  const proto = process.env.RAILWAY_PUBLIC_DOMAIN ? 'https' : 'http'
+  const url = `${proto}://${host}`
+  const qr = await qrcode.toDataURL(url)
+  res.json({ url, qr })
+})
 
 app.listen(PORT, '0.0.0.0', () => {
-  const ip     = getLocalIP();
-  const subnet = ip.split('.').slice(0, 3).join('.');
-  console.log('\n InstantDrop corriendo');
-  console.log(` Red:    http://${ip}:${PORT}`);
-  console.log(` Subred: ${subnet}.x`);
-  console.log(' Archivos van P2P — servidor no guarda nada en RAM\n');
-});
+  const ip = getLocalIP()
+  const subnet = ip.split('.').slice(0, 3).join('.')
+  console.log('\n InstantDrop corriendo')
+  console.log(` Red:    http://${ip}:${PORT}`)
+  console.log(` Subred: ${subnet}.x`)
+  console.log(' Archivos van P2P — servidor no guarda nada en RAM\n')
+})
