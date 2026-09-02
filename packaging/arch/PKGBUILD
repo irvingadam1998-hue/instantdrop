@@ -4,7 +4,7 @@
 # Ver: https://wiki.archlinux.org/title/VCS_package_guidelines
 
 pkgname=instantdrop-git
-pkgver=r43.3b9970a
+pkgver=r45.dae2914
 pkgrel=1
 pkgdesc="Comparte archivos y texto entre dispositivos en la misma red WiFi, sin cables ni nube (WebRTC P2P)"
 arch=('any')

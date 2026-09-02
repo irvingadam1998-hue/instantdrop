@@ -1,16 +1,18 @@
 #!/bin/bash
-# Lanzador de escritorio: arranca el servicio si no corre y abre InstantDrop
-# en su propia ventana (modo app de un navegador Chromium), sin barra de
-# direcciones ni pestañas — se ve como una app nativa, no como el navegador.
+# Lanzador de escritorio: abre InstantDrop en su propia ventana (modo app de
+# un navegador Chromium), sin barra de direcciones ni pestañas.
+#
+# Por defecto apunta a la instancia pública (https://instantdrop.site) para
+# que los dispositivos se detecten entre sí — todos comparten el mismo
+# servidor. Un servidor local propio (systemctl --user start
+# instantdrop.service) es una instancia separada y NO comparte dispositivos
+# con la instancia pública ni con otras instancias locales.
+#
+# Para apuntar a tu propio servidor local en su lugar:
+#   INSTANTDROP_URL="http://$(hostname -I | awk '{print $1}'):3000" instantdrop-open
 set -e
-PORT="${PORT:-3000}"
-URL="http://localhost:${PORT}"
+URL="${INSTANTDROP_URL:-https://instantdrop.site}"
 PROFILE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/instantdrop/app-profile"
-
-if ! systemctl --user is-active --quiet instantdrop.service; then
-  systemctl --user start instantdrop.service
-  sleep 1
-fi
 
 for browser in brave-browser brave google-chrome-stable google-chrome \
   chromium chromium-browser vivaldi-stable vivaldi \

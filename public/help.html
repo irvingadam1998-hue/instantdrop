@@ -621,7 +621,8 @@
       <p class="section-desc" data-i18n="help.linux.desc">
         InstantDrop funciona directamente en el navegador — no hace falta instalar nada. Pero si usás
         Manjaro o Arch Linux también podés instalarlo como una app nativa: ícono propio en el menú,
-        ventana sin barra de direcciones ni pestañas, y arranque como servicio del sistema.
+        ventana sin barra de direcciones ni pestañas, conectada a la misma instancia pública que la web
+        (así que detecta los mismos dispositivos).
       </p>
       <div class="cmd-block">
         <div class="cmd-label" data-i18n="help.linux.aur.label">Con un ayudante de AUR (recomendado)</div>
@@ -634,8 +635,10 @@ cd instantdrop/packaging/arch
 makepkg -si</code></pre>
       </div>
       <div class="tip" data-i18n="help.linux.tip">
-        Después de instalar, buscá <strong>InstantDrop</strong> en tu menú de aplicaciones, o arrancalo
-        como servicio de usuario con <code>systemctl --user enable --now instantdrop.service</code>.
+        Después de instalar, buscá <strong>InstantDrop</strong> en tu menú de aplicaciones — se abre
+        directo, sin pasos extra. Si preferís un servidor propio y aislado (por ejemplo sin internet),
+        usá <code>systemctl --user enable --now instantdrop.service</code> en su lugar — ojo que esa
+        instancia local no comparte dispositivos con la pública.
       </div>
     </div>
 
@@ -824,10 +827,10 @@ makepkg -si</code></pre>
         'help.limits.r5.label': 'Network requirement', 'help.limits.r5.val': 'Same WiFi or LAN network',
         'help.limits.r6.label': 'Internet connection', 'help.limits.r6.val': 'Only to load the app; transfer is local',
         'help.linux.title': 'Install as an app on Manjaro / Arch Linux',
-        'help.linux.desc': 'InstantDrop works directly in the browser — no installation needed. But if you use Manjaro or Arch Linux you can also install it as a native app: its own menu icon, a window with no address bar or tabs, and startup as a system service.',
+        'help.linux.desc': 'InstantDrop works directly in the browser — no installation needed. But if you use Manjaro or Arch Linux you can also install it as a native app: its own menu icon, a window with no address bar or tabs, connected to the same public instance as the web (so it detects the same devices).',
         'help.linux.aur.label': 'With an AUR helper (recommended)',
         'help.linux.manual.label': 'Manual, from source',
-        'help.linux.tip': 'After installing, look for <strong>InstantDrop</strong> in your app menu, or start it as a user service with <code>systemctl --user enable --now instantdrop.service</code>.',
+        'help.linux.tip': 'After installing, look for <strong>InstantDrop</strong> in your app menu — it opens right away, no extra steps. If you\'d rather run your own isolated server (e.g. without internet), use <code>systemctl --user enable --now instantdrop.service</code> instead — note that local instance won\'t share devices with the public one.',
         'help.faq.title': 'Frequently asked questions',
         'help.faq.q1': 'Why can\'t I see other devices?',
         'help.faq.a1': 'Make sure both devices are connected to the <strong>same WiFi network</strong>. Some networks have "client isolation" enabled (common in hotel or corporate networks), which prevents devices from seeing each other. In that case, use a personal hotspot or a home network.',
