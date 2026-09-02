@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { DM_Sans, DM_Mono } from 'next/font/google'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
 import { I18nProvider } from '@/lib/i18n'
 import './globals.css'
 
@@ -29,6 +31,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="es" className={`${dmSans.variable} ${dmMono.variable}`}>
       <body>
         <I18nProvider>{children}</I18nProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   )
