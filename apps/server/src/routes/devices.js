@@ -41,6 +41,7 @@ router.post('/register', rateLimit(20, 60_000), (req, res) => {
       emoji: device.emoji,
       token: device.token,
       roomId: normalizeRoomId(roomId) || getRoomDisplayLabel(roomKey),
+      deploymentId: req.deploymentId,
     })
   }
 
@@ -57,7 +58,13 @@ router.post('/register', rateLimit(20, 60_000), (req, res) => {
     lastSeen: Date.now(),
   })
 
-  res.json({ deviceId, emoji, token, roomId: normalizeRoomId(roomId) || getRoomDisplayLabel(roomKey) })
+  res.json({
+    deviceId,
+    emoji,
+    token,
+    roomId: normalizeRoomId(roomId) || getRoomDisplayLabel(roomKey),
+    deploymentId: req.deploymentId,
+  })
 })
 
 router.post('/heartbeat', (req, res) => {

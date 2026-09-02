@@ -9,6 +9,8 @@ const eventsRouter = require('./routes/events')
 const clipsRouter = require('./routes/clips')
 const qrRouter = require('./routes/qr')
 
+const DEPLOYMENT_ID = Date.now().toString(36)
+
 const app = express()
 
 app.set('trust proxy', 1) // Render sits behind a proxy; needed for req.ip / X-Forwarded-*
@@ -17,7 +19,14 @@ app.use(corsMiddleware)
 app.use(securityHeaders)
 app.use(express.json({ limit: '64kb' })) // clips/signals are small JSON payloads only
 
-app.get('/health', (req, res) => res.json({ ok: true }))
+app.get('/health', (req, res) =>
+  res.json({ ok: true, deploymentId: DEPLOYMENT_ID })
+)
+
+app.use((req, res, next) => {
+  req.deploymentId = DEPLOYMENT_ID
+  next()
+})
 
 app.use('/api', devicesRouter)
 app.use('/api', eventsRouter)
@@ -40,5 +49,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log('\nInstantDrop API corriendo')
   console.log(` Local:  http://localhost:${PORT}`)
   console.log(` Red:    http://${ip}:${PORT}`)
-  console.log(' Señalización WebRTC + clips en memoria — sin archivos en el servidor\n')
+  console.log(
+    ' Señalización WebRTC + clips en memoria — sin archivos en el servidor\n'
+  )
 })

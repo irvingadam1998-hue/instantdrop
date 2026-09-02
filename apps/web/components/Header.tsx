@@ -49,7 +49,15 @@ export function Header({
   const getServerIP = () => {
     try {
       const url = new URL(serverUrl || getServerBaseUrl())
-      return url.hostname
+      const hostname = url.hostname
+
+      // Solo mostrar si es IP privada o localhost
+      const isPrivate = /^(localhost|127\.|192\.168\.|10\.|172\.)/.test(
+        hostname
+      )
+
+      if (isPrivate) return hostname
+      return '🌐' // Ícono de internet para URLs públicas (Render)
     } catch {
       return '...'
     }

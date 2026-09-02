@@ -6,7 +6,9 @@ import { deviceStorage, normalizeRoomId } from '@/lib/storage'
 import * as api from '@/lib/api'
 import type { Clip, Device } from '@/lib/api'
 
-const STUN_SERVERS: RTCConfiguration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] }
+const STUN_SERVERS: RTCConfiguration = {
+  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+}
 const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
 const CHUNK_SIZE = 256 * 1024
 const HIGH_WATER = 4 * 1024 * 1024
@@ -35,6 +37,8 @@ export function useInstantDrop() {
   const [myEmoji, setMyEmoji] = useState('··')
   const [myRoomId, setMyRoomIdState] = useState('')
   const [ready, setReady] = useState(false)
+  const [deploymentId, setDeploymentId] = useState<string | null>(null)
+  const [esConnected, setEsConnected] = useState(false)
 
   // ── Network state ──
   const [devices, setDevices] = useState<Device[]>([])
@@ -44,7 +48,11 @@ export function useInstantDrop() {
   const [qr, setQr] = useState<{ url: string; qr: string } | null>(null)
 
   // ── Transient UI state ──
-  const [overlay, setOverlay] = useState<OverlayState>({ open: false, label: '', pct: '' })
+  const [overlay, setOverlay] = useState<OverlayState>({
+    open: false,
+    label: '',
+    pct: '',
+  })
   const [incoming, setIncoming] = useState<IncomingRequest | null>(null)
   const [recvText, setRecvText] = useState<string | null>(null)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
@@ -69,7 +77,9 @@ export function useInstantDrop() {
   const esRef = useRef<EventSource | null>(null)
   const esDelayRef = useRef(3000)
   const esRecoveringRef = useRef(false)
-  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined
+  )
 
   const toast = useCallback((msg: string) => {
     setToastMsg(msg)
@@ -84,35 +94,56 @@ export function useInstantDrop() {
       token: myTokenRef.current || undefined,
       roomId: myRoomIdRef.current || undefined,
     })
+
+    // Detect deployment change and clear stale credentials
+    const storedDeploymentId = deviceStorage.getDeploymentId()
+    if (
+      res.deploymentId &&
+      storedDeploymentId &&
+      res.deploymentId !== storedDeploymentId
+    ) {
+      deviceStorage.clear()
+    }
+
     setMyDeviceId(res.deviceId)
     setMyToken(res.token)
     setMyEmoji(res.emoji)
+    setDeploymentId(res.deploymentId || null)
     const resolvedRoomId = normalizeRoomId(res.roomId || myRoomIdRef.current)
     setMyRoomIdState(resolvedRoomId)
-    deviceStorage.save({ deviceId: res.deviceId, token: res.token, emoji: res.emoji, roomId: resolvedRoomId })
+    deviceStorage.save({
+      deviceId: res.deviceId,
+      token: res.token,
+      emoji: res.emoji,
+      roomId: resolvedRoomId,
+      deploymentId: res.deploymentId,
+    })
     return res
   }, [])
 
-  const setMyRoomId = useCallback(
-    (value: string) => {
-      const normalized = normalizeRoomId(value)
-      // Update the ref synchronously too — register() below reads it
-      // immediately, before this render's effects (which sync the ref
-      // from state) would otherwise get a chance to run.
-      myRoomIdRef.current = normalized
-      setMyRoomIdState(normalized)
-      deviceStorage.setRoomId(normalized)
-    },
-    [],
-  )
+  const setMyRoomId = useCallback((value: string) => {
+    const normalized = normalizeRoomId(value)
+    // Update the ref synchronously too — register() below reads it
+    // immediately, before this render's effects (which sync the ref
+    // from state) would otherwise get a chance to run.
+    myRoomIdRef.current = normalized
+    setMyRoomIdState(normalized)
+    deviceStorage.setRoomId(normalized)
+  }, [])
 
   // ── Devices & clips polling ──
   const loadDevices = useCallback(async () => {
     if (!myDeviceIdRef.current) return
-    const list = await api.fetchDevices(myDeviceIdRef.current, myRoomIdRef.current || undefined)
+    const list = await api.fetchDevices(
+      myDeviceIdRef.current,
+      myRoomIdRef.current || undefined
+    )
     list.forEach((d) => deviceEmojis.current.set(d.id, d.emoji))
     setDevices(list)
-    if (selectedIdRef.current && !list.find((d) => d.id === selectedIdRef.current)) {
+    if (
+      selectedIdRef.current &&
+      !list.find((d) => d.id === selectedIdRef.current)
+    ) {
       setSelectedId(null)
     }
   }, [])
@@ -127,16 +158,19 @@ export function useInstantDrop() {
   }, [loadDevices, loadClips])
 
   // ── WebRTC signaling ──
-  const signal = useCallback(async (to: string, type: string, data: unknown) => {
-    await api.sendSignal({
-      to,
-      from: myDeviceIdRef.current,
-      token: myTokenRef.current,
-      type,
-      data,
-      roomId: myRoomIdRef.current || undefined,
-    })
-  }, [])
+  const signal = useCallback(
+    async (to: string, type: string, data: unknown) => {
+      await api.sendSignal({
+        to,
+        from: myDeviceIdRef.current,
+        token: myTokenRef.current,
+        type,
+        data,
+        roomId: myRoomIdRef.current || undefined,
+      })
+    },
+    []
+  )
 
   const hideOverlay = useCallback(() => {
     setOverlay({ open: false, label: '', pct: '' })
@@ -155,7 +189,9 @@ export function useInstantDrop() {
 
       for (const file of files) {
         showOverlay(`${t('overlay.sending')} ${file.name}`, '0%')
-        dc.send(JSON.stringify({ type: 'meta', name: file.name, size: file.size }))
+        dc.send(
+          JSON.stringify({ type: 'meta', name: file.name, size: file.size })
+        )
 
         let offset = 0
         let lastPct = -1
@@ -189,7 +225,7 @@ export function useInstantDrop() {
         peerConnections.current.delete(peerId)
       }, 4000)
     },
-    [hideOverlay, showOverlay, t, toast],
+    [hideOverlay, showOverlay, t, toast]
   )
 
   const sendQueued = useCallback(
@@ -211,15 +247,25 @@ export function useInstantDrop() {
       const files = pendingFiles.current.get(peerId) || []
       if (!files.length) return
       showOverlay(t('overlay.waiting'), '⏳')
-      dc.send(JSON.stringify({ type: 'request', files: files.map((f) => ({ name: f.name, size: f.size })) }))
+      dc.send(
+        JSON.stringify({
+          type: 'request',
+          files: files.map((f) => ({ name: f.name, size: f.size })),
+        })
+      )
     },
-    [hideOverlay, showOverlay, t, toast],
+    [hideOverlay, showOverlay, t, toast]
   )
 
   const receiveOn = useCallback(
     (dc: RTCDataChannel, peerId: string) => {
       dc.binaryType = 'arraybuffer'
-      let state: { name: string; size: number; chunks: BlobPart[]; got: number } | null = null
+      let state: {
+        name: string
+        size: number
+        chunks: BlobPart[]
+        got: number
+      } | null = null
       let doneCount = 0
       let expectedFiles = 1
 
@@ -251,11 +297,20 @@ export function useInstantDrop() {
             if (!Array.isArray(msg.files) || !msg.files.length) return
             expectedFiles = msg.files.length
             incomingDCRef.current = dc
-            setIncoming({ files: msg.files, peerId, peerEmoji: deviceEmojis.current.get(peerId) || '👤' })
+            setIncoming({
+              files: msg.files,
+              peerId,
+              peerEmoji: deviceEmojis.current.get(peerId) || '👤',
+            })
             return
           }
           if (msg.type === 'meta') {
-            if (typeof msg.name !== 'string' || typeof msg.size !== 'number' || msg.size < 0) return
+            if (
+              typeof msg.name !== 'string' ||
+              typeof msg.size !== 'number' ||
+              msg.size < 0
+            )
+              return
             state = { name: msg.name, size: msg.size, chunks: [], got: 0 }
             showOverlay(`${t('overlay.receiving')} ${msg.name}`, '0%')
           } else if (msg.type === 'done' && state) {
@@ -275,11 +330,14 @@ export function useInstantDrop() {
         } else if (state) {
           state.chunks.push(e.data)
           state.got += (e.data as ArrayBuffer).byteLength
-          setOverlay((prev) => ({ ...prev, pct: Math.round((state!.got / state!.size) * 100) + '%' }))
+          setOverlay((prev) => ({
+            ...prev,
+            pct: Math.round((state!.got / state!.size) * 100) + '%',
+          }))
         }
       }
     },
-    [hideOverlay, showOverlay, t, toast],
+    [hideOverlay, showOverlay, t, toast]
   )
 
   const createPC = useCallback(
@@ -348,7 +406,7 @@ export function useInstantDrop() {
       }
       return pc
     },
-    [hideOverlay, receiveOn, sendQueued, signal, startActualTransfer, t, toast],
+    [hideOverlay, receiveOn, sendQueued, signal, startActualTransfer, t, toast]
   )
 
   const connectEvents = useCallback(() => {
@@ -356,14 +414,20 @@ export function useInstantDrop() {
       esRef.current.close()
       esRef.current = null
     }
+    setEsConnected(false)
     if (!myDeviceIdRef.current || !myTokenRef.current) return
 
     const es = new EventSource(
-      api.eventsUrl(myDeviceIdRef.current, myTokenRef.current, myRoomIdRef.current || undefined),
+      api.eventsUrl(
+        myDeviceIdRef.current,
+        myTokenRef.current,
+        myRoomIdRef.current || undefined
+      )
     )
     esRef.current = es
 
     es.onopen = () => {
+      setEsConnected(true)
       esDelayRef.current = 3000
       esRecoveringRef.current = false
     }
@@ -390,6 +454,7 @@ export function useInstantDrop() {
     }
 
     es.onerror = () => {
+      setEsConnected(false)
       es.close()
       esRef.current = null
       setTimeout(connectEvents, esDelayRef.current)
@@ -402,13 +467,15 @@ export function useInstantDrop() {
     (files: File[]) => {
       const oversized = files.filter((f) => f.size > MAX_FILE_SIZE)
       if (oversized.length) {
-        const names = oversized.map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(1)} MB)`).join(', ')
+        const names = oversized
+          .map((f) => `${f.name} (${(f.size / 1024 / 1024).toFixed(1)} MB)`)
+          .join(', ')
         toast(`${t('toast.oversized')}: ${names}`)
         return false
       }
       return true
     },
-    [t, toast],
+    [t, toast]
   )
 
   const sendFiles = useCallback(
@@ -418,6 +485,19 @@ export function useInstantDrop() {
         return
       }
       if (!validateFiles(files)) return
+
+      // Wait for EventSource to connect (up to 5 seconds)
+      for (let i = 0; i < 50; i++) {
+        if (esRef.current?.readyState === EventSource.OPEN) break
+        await new Promise((r) => setTimeout(r, 100))
+      }
+      if (esRef.current?.readyState !== EventSource.OPEN) {
+        toast(
+          t('toast.connection_error') || 'Conexión no lista, intenta de nuevo'
+        )
+        return
+      }
+
       setIsBusy(true)
       pendingFiles.current.set(targetId, files)
       showOverlay(t('overlay.connecting'), '')
@@ -426,7 +506,7 @@ export function useInstantDrop() {
       await pc.setLocalDescription(offer)
       signal(targetId, 'offer', pc.localDescription)
     },
-    [createPC, showOverlay, signal, t, toast, validateFiles],
+    [createPC, showOverlay, signal, t, toast, validateFiles]
   )
 
   const sendText = useCallback(
@@ -435,6 +515,19 @@ export function useInstantDrop() {
         toast(t('toast.busy'))
         return
       }
+
+      // Wait for EventSource to connect (up to 5 seconds)
+      for (let i = 0; i < 50; i++) {
+        if (esRef.current?.readyState === EventSource.OPEN) break
+        await new Promise((r) => setTimeout(r, 100))
+      }
+      if (esRef.current?.readyState !== EventSource.OPEN) {
+        toast(
+          t('toast.connection_error') || 'Conexión no lista, intenta de nuevo'
+        )
+        return
+      }
+
       setIsBusy(true)
       pendingTexts.current.set(targetId, text)
       showOverlay(t('overlay.connecting'), '')
@@ -443,7 +536,7 @@ export function useInstantDrop() {
       await pc.setLocalDescription(offer)
       signal(targetId, 'offer', pc.localDescription)
     },
-    [createPC, showOverlay, signal, t, toast],
+    [createPC, showOverlay, signal, t, toast]
   )
 
   const selectDevice = useCallback(
@@ -454,7 +547,7 @@ export function useInstantDrop() {
       }
       setSelectedId((prev) => (prev === id ? null : id))
     },
-    [t, toast],
+    [t, toast]
   )
 
   const cancelTransfer = useCallback(() => {
@@ -495,7 +588,7 @@ export function useInstantDrop() {
       await loadClips()
       toast(t('toast.text_shared'))
     },
-    [loadClips, t, toast],
+    [loadClips, t, toast]
   )
 
   const removeClip = useCallback(
@@ -503,7 +596,7 @@ export function useInstantDrop() {
       await api.deleteClip(id, myRoomIdRef.current || undefined)
       await loadClips()
     },
-    [loadClips],
+    [loadClips]
   )
 
   const copyText = useCallback(
@@ -516,7 +609,7 @@ export function useInstantDrop() {
         return false
       }
     },
-    [t, toast],
+    [t, toast]
   )
 
   const loadQr = useCallback(async () => {
@@ -531,7 +624,7 @@ export function useInstantDrop() {
       await loadDevices()
       connectEvents()
     },
-    [connectEvents, loadDevices, register, setMyRoomId],
+    [connectEvents, loadDevices, register, setMyRoomId]
   )
 
   // ── Init ──
@@ -540,6 +633,7 @@ export function useInstantDrop() {
     setMyToken(deviceStorage.getToken() || '')
     setMyEmoji(deviceStorage.getEmoji())
     setMyRoomIdState(deviceStorage.getRoomId())
+    setDeploymentId(deviceStorage.getDeploymentId())
     setReady(true)
   }, [])
 
@@ -548,7 +642,6 @@ export function useInstantDrop() {
     let cancelled = false
     let heartbeatId: ReturnType<typeof setInterval>
     let pollId: ReturnType<typeof setInterval>
-
     ;(async () => {
       await register()
       await loadQr()

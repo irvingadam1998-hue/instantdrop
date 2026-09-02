@@ -5,6 +5,7 @@ export interface RegisterResponse {
   emoji: string
   token: string
   roomId: string | null
+  deploymentId?: string
 }
 
 export interface Device {
@@ -37,20 +38,33 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
   return res.json() as Promise<T>
 }
 
-export function register(payload: { deviceId?: string | null; token?: string | null; roomId?: string }) {
+export function register(payload: {
+  deviceId?: string | null
+  token?: string | null
+  roomId?: string
+}) {
   return postJson<RegisterResponse>('/api/register', payload)
 }
 
-export function heartbeat(payload: { deviceId: string; token: string; roomId?: string }) {
+export function heartbeat(payload: {
+  deviceId: string
+  token: string
+  roomId?: string
+}) {
   return postJson<{ ok: boolean }>('/api/heartbeat', payload)
 }
 
-export async function fetchDevices(me: string, roomId?: string): Promise<Device[]> {
+export async function fetchDevices(
+  me: string,
+  roomId?: string
+): Promise<Device[]> {
   const res = await fetch(url('/api/devices', { me, roomId }))
   return res.json()
 }
 
-export async function fetchQr(pageUrl: string): Promise<{ url: string; qr: string }> {
+export async function fetchQr(
+  pageUrl: string
+): Promise<{ url: string; qr: string }> {
   const res = await fetch(url('/api/qr', { url: pageUrl }))
   return res.json()
 }
@@ -76,9 +90,14 @@ export async function fetchClips(roomId?: string): Promise<Clip[]> {
 }
 
 export function createClip(text: string, roomId?: string) {
-  return postJson<{ ok: boolean; id?: string; error?: string }>('/api/clips', { text, roomId })
+  return postJson<{ ok: boolean; id?: string; error?: string }>('/api/clips', {
+    text,
+    roomId,
+  })
 }
 
 export async function deleteClip(id: string, roomId?: string) {
-  await fetch(url(`/api/clips/${encodeURIComponent(id)}`, { roomId }), { method: 'DELETE' })
+  await fetch(url(`/api/clips/${encodeURIComponent(id)}`, { roomId }), {
+    method: 'DELETE',
+  })
 }

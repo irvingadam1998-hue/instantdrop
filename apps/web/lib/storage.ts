@@ -7,6 +7,7 @@ const KEYS = {
   emoji: 'InstantDrop-emoji',
   roomId: 'InstantDrop-roomId',
   lang: 'lang',
+  deploymentId: 'InstantDrop-deploymentId',
 } as const
 
 export function normalizeRoomId(raw: string | null | undefined): string {
@@ -41,13 +42,34 @@ export const deviceStorage = {
   getToken: () => safeGet(KEYS.token),
   getEmoji: () => safeGet(KEYS.emoji) || '··',
   getRoomId: () => normalizeRoomId(safeGet(KEYS.roomId)),
-  save({ deviceId, token, emoji, roomId }: { deviceId: string; token: string; emoji: string; roomId: string }) {
+  getDeploymentId: () => safeGet(KEYS.deploymentId),
+  save({
+    deviceId,
+    token,
+    emoji,
+    roomId,
+    deploymentId,
+  }: {
+    deviceId: string
+    token: string
+    emoji: string
+    roomId: string
+    deploymentId?: string
+  }) {
     safeSet(KEYS.deviceId, deviceId)
     safeSet(KEYS.token, token)
     safeSet(KEYS.emoji, emoji)
     safeSet(KEYS.roomId, roomId)
+    if (deploymentId) safeSet(KEYS.deploymentId, deploymentId)
   },
   setRoomId: (roomId: string) => safeSet(KEYS.roomId, roomId),
+  clear: () => {
+    safeSet(KEYS.deviceId, '')
+    safeSet(KEYS.token, '')
+    safeSet(KEYS.emoji, '')
+    safeSet(KEYS.roomId, '')
+    safeSet(KEYS.deploymentId, '')
+  },
 }
 
 export const langStorage = {
