@@ -8,9 +8,36 @@ const PORT = process.env.PORT || 4000
 const DEVICE_TIMEOUT_MS = 30_000
 
 const EMOJIS = [
-  '🐶', '🐱', '🐭', '🐹', '🐰', '🦊', '🐻', '🐼', '🐨', '🐯',
-  '🦁', '🐮', '🐸', '🐵', '🐧', '🐦', '🦆', '🦅', '🦉', '🦋',
-  '🐺', '🐗', '🐴', '🦄', '🐝', '🐞', '🐬', '🐙', '🦈', '🦒',
+  '🐶',
+  '🐱',
+  '🐭',
+  '🐹',
+  '🐰',
+  '🦊',
+  '🐻',
+  '🐼',
+  '🐨',
+  '🐯',
+  '🦁',
+  '🐮',
+  '🐸',
+  '🐵',
+  '🐧',
+  '🐦',
+  '🦆',
+  '🦅',
+  '🦉',
+  '🦋',
+  '🐺',
+  '🐗',
+  '🐴',
+  '🦄',
+  '🐝',
+  '🐞',
+  '🐬',
+  '🐙',
+  '🦈',
+  '🦒',
 ]
 
 // Explicit list of frontend origins allowed to call this API (comma-separated).
@@ -22,7 +49,8 @@ const FRONTEND_ORIGINS = (process.env.FRONTEND_URL || '')
 
 function getLocalIP() {
   const ifaces = os.networkInterfaces()
-  const skip = /virtual|vmware|vbox|hyper|vethernet|loopback|bluetooth|tunnel|tap|tun/i
+  const skip =
+    /virtual|vmware|vbox|hyper|vethernet|loopback|bluetooth|tunnel|tap|tun/i
   const prefer = /wi.?fi|wlan|wireless/i
   let fallback = null
   for (const [name, addrs] of Object.entries(ifaces)) {
@@ -110,16 +138,24 @@ function getRoomKey(req, roomId) {
 
   // Priority: LAN/private subnet first (ensures same-WiFi discovery)
   const clientIP = getClientIP(req)
-  if (clientIP && clientIP !== '127.0.0.1' && clientIP !== '::1' && isPrivateIP(clientIP)) {
+  if (
+    clientIP &&
+    clientIP !== '127.0.0.1' &&
+    clientIP !== '::1' &&
+    isPrivateIP(clientIP)
+  ) {
     return `lan:${clientSubnet(req)}`
   }
 
   // Fall back to hostname-based room for public IPs
-  const host = ((req.headers['x-forwarded-host'] || req.headers.host || '') + '')
+  const host = (
+    (req.headers['x-forwarded-host'] || req.headers.host || '') + ''
+  )
     .split(',')[0]
     .split(':')[0]
     .toLowerCase()
-  const isLocalHost = !host || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(host)
+  const isLocalHost =
+    !host || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(host)
   if (!isLocalHost) {
     const siteKey = host
       .replace(/^www\./, '')
