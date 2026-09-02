@@ -123,7 +123,9 @@ function getRoomKey(req, roomId) {
   const forced = normalizeRoomId(process.env.APP_ROOM_ID)
   if (forced) return `room:${forced}`
 
-  const host = ((req.headers['x-forwarded-host'] || req.headers.host || '') + '')
+  const host = (
+    (req.headers['x-forwarded-host'] || req.headers.host || '') + ''
+  )
     .split(',')[0]
     .split(':')[0]
     .toLowerCase()
@@ -199,7 +201,7 @@ app.use(express.json())
 // Middleware: Redirigir www a non-www
 app.use((req, res, next) => {
   let host = req.headers.host || ''
-  
+
   // Eliminar www
   if (host.startsWith('www.')) {
     const newHost = host.slice(4)
@@ -207,7 +209,7 @@ app.use((req, res, next) => {
     const proto = IS_PRODUCTION ? 'https' : req.protocol
     return res.redirect(301, `${proto}://${newHost}${req.originalUrl}`)
   }
-  
+
   next()
 })
 

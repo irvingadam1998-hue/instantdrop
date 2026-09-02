@@ -1,0 +1,37 @@
+# Render Blueprint — deploys the backend and frontend as two independent
+# web services from this same monorepo. See:
+# https://render.com/docs/blueprint-spec
+#
+# After the first deploy, set FRONTEND_URL (on instantdrop-server) and
+# NEXT_PUBLIC_SERVER_URL (on instantdrop-web) to each other's public Render
+# URLs, then trigger a redeploy of instantdrop-web so the build picks up the
+# NEXT_PUBLIC_* value (Next.js inlines it at build time).
+services:
+  - type: web
+    name: instantdrop-server
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm run start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ROOM_ID
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+
+  - type: web
+    name: instantdrop-web
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:web
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_SERVER_URL
+        sync: false

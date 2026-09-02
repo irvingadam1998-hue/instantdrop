@@ -1,8 +1,15 @@
+# Dependencies
 node_modules/
-package-lock.json
-.package-lock.json
+
+# Env files — never commit real secrets/config, only .env.example templates
 .env
-.claude
-claude
-claude/
-.env.example
+.env.local
+.env.*.local
+
+# Next.js build output
+.next/
+out/
+
+# Misc
+.claude/
+*.log
