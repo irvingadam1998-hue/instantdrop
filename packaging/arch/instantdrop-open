@@ -1,0 +1,29 @@
+#!/bin/bash
+# Lanzador de escritorio: arranca el servicio si no corre y abre InstantDrop
+# en su propia ventana (modo app de un navegador Chromium), sin barra de
+# direcciones ni pestañas — se ve como una app nativa, no como el navegador.
+set -e
+PORT="${PORT:-3000}"
+URL="http://localhost:${PORT}"
+PROFILE_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/instantdrop/app-profile"
+
+if ! systemctl --user is-active --quiet instantdrop.service; then
+  systemctl --user start instantdrop.service
+  sleep 1
+fi
+
+for browser in brave-browser brave google-chrome-stable google-chrome \
+  chromium chromium-browser vivaldi-stable vivaldi \
+  microsoft-edge-stable microsoft-edge; do
+  if command -v "$browser" >/dev/null 2>&1; then
+    mkdir -p "$PROFILE_DIR"
+    exec "$browser" \
+      "--app=${URL}" \
+      "--user-data-dir=${PROFILE_DIR}" \
+      "--class=InstantDrop" \
+      "--name=InstantDrop"
+  fi
+done
+
+# Ningún navegador Chromium instalado: abrir en el navegador predeterminado (pestaña normal)
+xdg-open "$URL" >/dev/null 2>&1 &

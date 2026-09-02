@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=InstantDrop
+Comment=Comparte archivos y texto entre dispositivos en tu red WiFi local
+Exec=instantdrop-open
+Icon=instantdrop
+Terminal=false
+StartupNotify=true
+StartupWMClass=InstantDrop
+Categories=Network;FileTransfer;

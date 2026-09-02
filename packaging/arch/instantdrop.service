@@ -1,0 +1,11 @@
+[Unit]
+Description=InstantDrop - comparte archivos y texto en tu red WiFi local
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/instantdrop
+Restart=on-failure
+Environment=PORT=3000
+
+[Install]
+WantedBy=default.target

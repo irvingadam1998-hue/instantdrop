@@ -1,0 +1,61 @@
+# Maintainer: Irving Vasquez <ivasquez@hypernovalabs.com>
+#
+# Paquete VCS (no hay tags publicados en el repo, se empaqueta desde HEAD de main).
+# Ver: https://wiki.archlinux.org/title/VCS_package_guidelines
+
+pkgname=instantdrop-git
+pkgver=r43.3b9970a
+pkgrel=1
+pkgdesc="Comparte archivos y texto entre dispositivos en la misma red WiFi, sin cables ni nube (WebRTC P2P)"
+arch=('any')
+url="https://github.com/irvingadam1998-hue/instantdrop"
+license=('ISC')
+depends=('nodejs')
+makedepends=('git' 'npm')
+optdepends=('brave-browser: ventana de app propia para el lanzador de escritorio'
+            'google-chrome: ventana de app propia para el lanzador de escritorio'
+            'chromium: ventana de app propia para el lanzador de escritorio'
+            'xdg-utils: abrir en el navegador predeterminado si no hay ninguno basado en Chromium')
+provides=('instantdrop')
+conflicts=('instantdrop')
+source=("$pkgname::git+https://github.com/irvingadam1998-hue/instantdrop.git"
+         "instantdrop.service"
+         "instantdrop"
+         "instantdrop-open"
+         "instantdrop.desktop")
+sha256sums=('SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP'
+            'SKIP')
+
+pkgver() {
+  cd "$srcdir/$pkgname"
+  printf "r%s.%s" "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "$srcdir/$pkgname"
+  # No hay package-lock.json en el repo (está en .gitignore), así que se resuelven
+  # versiones vía package.json. Antes de actualizar este PKGBUILD, revisar los
+  # paquetes en npm audit / Socket.dev / GitHub Advisory Database, en especial si
+  # cambian de mantenedor o agregan scripts preinstall/postinstall.
+  npm install --omit=dev --no-audit --no-fund
+}
+
+package() {
+  cd "$srcdir/$pkgname"
+
+  install -dm755 "$pkgdir/usr/share/webapps/instantdrop"
+  cp -a server.js package.json node_modules public "$pkgdir/usr/share/webapps/instantdrop/"
+
+  install -Dm644 "$srcdir/instantdrop.service" \
+    "$pkgdir/usr/lib/systemd/user/instantdrop.service"
+
+  install -Dm755 "$srcdir/instantdrop" "$pkgdir/usr/bin/instantdrop"
+  install -Dm755 "$srcdir/instantdrop-open" "$pkgdir/usr/bin/instantdrop-open"
+
+  install -Dm644 "$srcdir/instantdrop.desktop" \
+    "$pkgdir/usr/share/applications/instantdrop.desktop"
+  install -Dm644 public/logo.png "$pkgdir/usr/share/pixmaps/instantdrop.png"
+}

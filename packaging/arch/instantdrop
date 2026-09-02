@@ -1,0 +1,4 @@
+#!/bin/bash
+# Wrapper de lanzamiento para el paquete instantdrop-git
+cd /usr/share/webapps/instantdrop || exit 1
+exec node server.js "$@"
