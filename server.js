@@ -82,13 +82,14 @@ function getLocalIP() {
 }
 
 function getClientIP(req) {
-  // Solo confiar en X-Forwarded-For si estamos en Railway (proxy conocido)
-  // En local, cualquiera podría falsificar ese header
-  if (IS_PRODUCTION && process.env.RAILWAY_PUBLIC_DOMAIN) {
+  // Vercel y Railway envían X-Forwarded-For. En producción lo usamos como fuente real.
+  // En local, no confiamos en ese header porque se puede spoofear.
+  if (IS_PRODUCTION) {
     const forwarded = (req.headers['x-forwarded-for'] || '')
-      .split(',')[0]
-      .trim()
-    if (forwarded) return forwarded.replace(/^::ffff:/, '')
+      .split(',')
+      .map((ip) => ip.trim())
+      .filter(Boolean)
+    if (forwarded.length) return forwarded[0].replace(/^::ffff:/, '')
   }
   return (req.socket.remoteAddress || '').replace(/^::ffff:/, '')
 }
@@ -119,7 +120,13 @@ function getRoomKey(req, roomId) {
   const normalized = normalizeRoomId(roomId)
   if (normalized) return `room:${normalized}`
 
-  const host = (req.headers.host || '').split(':')[0].toLowerCase()
+  const forced = normalizeRoomId(process.env.APP_ROOM_ID)
+  if (forced) return `room:${forced}`
+
+  const host = ((req.headers['x-forwarded-host'] || req.headers.host || '') + '')
+    .split(',')[0]
+    .split(':')[0]
+    .toLowerCase()
   const isLocalHost =
     !host || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(host)
   if (!isLocalHost) {
@@ -212,7 +219,12 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'no-referrer')
   res.setHeader('Cross-Origin-Opener-Policy', 'same-origin')
   res.setHeader('Cross-Origin-Resource-Policy', 'same-origin')
-  if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+  if (
+    process.env.RAILWAY_PUBLIC_DOMAIN ||
+    process.env.VERCEL ||
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL
+  ) {
     res.setHeader(
       'Strict-Transport-Security',
       'max-age=31536000; includeSubDomains'
@@ -257,10 +269,11 @@ function serveHtml(file) {
     const robotsMeta = IS_PRODUCTION
       ? '<meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1">'
       : '<meta name="robots" content="noindex,nofollow,noarchive">'
+    const forcedRoomId = normalizeRoomId(process.env.APP_ROOM_ID) || ''
     const html = htmlCache[file]
       .replace(
         '<meta charset="UTF-8">',
-        `<meta charset="UTF-8"><script>window.__PROD__=${IS_PRODUCTION}</script>${getAnalyticsSnippet()}${getSpeedInsightsSnippet()}`
+        `<meta charset="UTF-8"><script>window.__PROD__=${IS_PRODUCTION};window.__APP_ROOM_ID__=${JSON.stringify(forcedRoomId)};</script>${getAnalyticsSnippet()}${getSpeedInsightsSnippet()}`
       )
       .replace('{{ROBOTS_META}}', robotsMeta)
     res.type('html').send(html)
@@ -356,11 +369,17 @@ app.get('/api/devices', (req, res) => {
 // ── Señalización WebRTC (SSE) ──
 // El servidor SOLO reenvía mensajes — nunca toca los archivos
 app.get('/api/events', (req, res) => {
-  const { deviceId, token } = req.query
+  const { deviceId, token, roomId } = req.query
+  const requestedRoomKey = roomId ? getRoomKey(req, roomId) : null
 
-  // Validar que el dispositivo existe y el token es correcto
+  // Validar que el dispositivo existe, el token es correcto y pertenece a la sala pedida
   const found = findDevice(deviceId)
-  if (!found || found.device.token !== token) return res.status(403).end()
+  if (
+    !found ||
+    found.device.token !== token ||
+    (requestedRoomKey && found.roomKey !== requestedRoomKey)
+  )
+    return res.status(403).end()
 
   res.setHeader('Content-Type', 'text/event-stream')
   res.setHeader('Cache-Control', 'no-cache')
@@ -451,8 +470,17 @@ app.delete('/api/clips/:id', rateLimit(30, 60_000), (req, res) => {
 
 // ── QR ──
 app.get('/api/qr', async (req, res) => {
-  const host = process.env.RAILWAY_PUBLIC_DOMAIN || `${getLocalIP()}:${PORT}`
-  const proto = process.env.RAILWAY_PUBLIC_DOMAIN ? 'https' : 'http'
+  const host =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL ||
+    process.env.RAILWAY_PUBLIC_DOMAIN ||
+    `${getLocalIP()}:${PORT}`
+  const proto =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL ||
+    process.env.VERCEL_URL ||
+    process.env.RAILWAY_PUBLIC_DOMAIN
+      ? 'https'
+      : 'http'
   const url = `${proto}://${host}`
   const qr = await qrcode.toDataURL(url)
   res.json({ url, qr })

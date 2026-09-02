@@ -1880,6 +1880,8 @@
     let myToken = localStorage.getItem('InstantDrop-token');
     let myEmoji = localStorage.getItem('InstantDrop-emoji') || '··';
     const defaultRoomId = (() => {
+      const forced = normalizeRoomId(window.__APP_ROOM_ID__ || '');
+      if (forced) return forced;
       const host = (window.location.hostname || 'instantdrop').replace(/^www\./i, '').replace(/[^a-z0-9]/gi, '').toUpperCase();
       return host ? `AUTO-${host.slice(0, 18)}` : 'AUTO-INSTANTDROP';
     })();
@@ -2164,15 +2166,28 @@
     // ── WebRTC: señalización via SSE ──
     let _es = null;
     let _esDelay = 3000; // backoff: 3s → 6s → 12s → máx 20s
+    let _esRecovering = false;
     function connectEvents() {
       if (_es) { _es.close(); _es = null; }
+      if (!myDeviceId || !myToken) return;
       const url = new URL('/api/events', window.location.origin);
       url.searchParams.set('deviceId', myDeviceId || '');
       url.searchParams.set('token', myToken || '');
       if (myRoomId) url.searchParams.set('roomId', myRoomId);
       const es = new EventSource(url.toString());
       _es = es;
-      es.onopen = () => { _esDelay = 3000; }; // resetear backoff al conectar
+      es.onopen = () => { _esDelay = 3000; _esRecovering = false; }; // resetear backoff al conectar
+      es.onerror = async () => {
+        if (es.readyState === EventSource.CLOSED && !_esRecovering) {
+          _esRecovering = true;
+          try {
+            await register();
+            connectEvents();
+          } catch {
+            _esRecovering = false;
+          }
+        }
+      };
       es.onmessage = async (e) => {
         _esDelay = 3000;
         const { from, type, data } = JSON.parse(e.data);
