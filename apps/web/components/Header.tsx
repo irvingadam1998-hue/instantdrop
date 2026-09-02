@@ -1,6 +1,8 @@
 'use client'
 
+import { useCallback, useState, useEffect } from 'react'
 import { useI18n } from '@/lib/i18n'
+import { getServerBaseUrl } from '@/lib/config'
 
 export function Header({
   roomId,
@@ -18,6 +20,40 @@ export function Header({
   addDisabled: boolean
 }) {
   const { t, lang, toggleLang } = useI18n()
+  const [serverUrl, setServerUrl] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    setServerUrl(getServerBaseUrl())
+  }, [])
+
+  const copyServerUrl = useCallback(async () => {
+    const urlToCopy = serverUrl || getServerBaseUrl()
+    try {
+      await navigator.clipboard.writeText(urlToCopy)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Fallback: seleccionar el texto
+      const input = document.createElement('input')
+      input.value = urlToCopy
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+  }, [serverUrl])
+
+  const getServerIP = () => {
+    try {
+      const url = new URL(serverUrl || getServerBaseUrl())
+      return url.hostname
+    } catch {
+      return '...'
+    }
+  }
 
   return (
     <header>
@@ -35,16 +71,31 @@ export function Header({
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
           }}
         />
-        <button className="ip-badge" onClick={onOpenQr} aria-label="QR">
-          ···
+        <button
+          className="ip-badge"
+          onClick={copyServerUrl}
+          title={`Copiar: ${serverUrl}`}
+          aria-label={`IP local: ${getServerIP()}`}
+        >
+          {copied ? '✓' : getServerIP()}
         </button>
         <button className="lang-btn" onClick={toggleLang}>
           {lang === 'es' ? 'EN' : 'ES'}
         </button>
-        <button className="ctrl-btn" onClick={onOpenQr} title="QR" aria-label="Mostrar código QR">
+        <button
+          className="ctrl-btn"
+          onClick={onOpenQr}
+          title="QR"
+          aria-label="Mostrar código QR"
+        >
           ⊞
         </button>
-        <button className="ctrl-btn" onClick={onOpenText} title={t('app.text_link')} aria-label="Compartir texto">
+        <button
+          className="ctrl-btn"
+          onClick={onOpenText}
+          title={t('app.text_link')}
+          aria-label="Compartir texto"
+        >
           ¶
         </button>
         <button
