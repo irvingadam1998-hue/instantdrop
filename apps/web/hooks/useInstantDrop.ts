@@ -492,9 +492,7 @@ export function useInstantDrop() {
         await new Promise((r) => setTimeout(r, 100))
       }
       if (esRef.current?.readyState !== EventSource.OPEN) {
-        toast(
-          t('toast.connection_error') || 'Conexión no lista, intenta de nuevo'
-        )
+        toast(t('toast.no_connect'))
         return
       }
 
@@ -522,9 +520,7 @@ export function useInstantDrop() {
         await new Promise((r) => setTimeout(r, 100))
       }
       if (esRef.current?.readyState !== EventSource.OPEN) {
-        toast(
-          t('toast.connection_error') || 'Conexión no lista, intenta de nuevo'
-        )
+        toast(t('toast.no_connect'))
         return
       }
 
