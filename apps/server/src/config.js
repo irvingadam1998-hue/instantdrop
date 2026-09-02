@@ -97,10 +97,10 @@ function normalizeRoomId(raw) {
 //   1. Explicit roomId from the request always wins (lets users share a code).
 //   2. APP_ROOM_ID pins every client hitting this deployment to one fixed room.
 //      Set this on Render so the room never shifts under a shared/public domain.
-//   3. A per-hostname key, derived only from the Host header (never client IP),
-//      so a given public domain always maps to the same room.
-//   4. LAN subnet as a last-resort fallback for local network discovery when
-//      none of the above apply (bare IP access, no host header).
+//   3. LAN subnet for private IPs — ensures two devices on the same WiFi/network
+//      automatically discover each other, even when accessing via public domain.
+//   4. A per-hostname key for public IPs from different networks.
+//   5. LAN subnet as fallback for any other case.
 function getRoomKey(req, roomId) {
   const explicit = normalizeRoomId(roomId)
   if (explicit) return `room:${explicit}`
@@ -108,6 +108,13 @@ function getRoomKey(req, roomId) {
   const forced = normalizeRoomId(process.env.APP_ROOM_ID)
   if (forced) return `room:${forced}`
 
+  // Priority: LAN/private subnet first (ensures same-WiFi discovery)
+  const clientIP = getClientIP(req)
+  if (clientIP && clientIP !== '127.0.0.1' && clientIP !== '::1' && isPrivateIP(clientIP)) {
+    return `lan:${clientSubnet(req)}`
+  }
+
+  // Fall back to hostname-based room for public IPs
   const host = ((req.headers['x-forwarded-host'] || req.headers.host || '') + '')
     .split(',')[0]
     .split(':')[0]
