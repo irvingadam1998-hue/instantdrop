@@ -330,10 +330,13 @@ export function useInstantDrop() {
         } else if (state) {
           state.chunks.push(e.data)
           state.got += (e.data as ArrayBuffer).byteLength
-          setOverlay((prev) => ({
-            ...prev,
-            pct: Math.round((state!.got / state!.size) * 100) + '%',
-          }))
+          setOverlay((prev) => {
+            if (!state) return prev
+            return {
+              ...prev,
+              pct: Math.round((state.got / state.size) * 100) + '%',
+            }
+          })
         }
       }
     },

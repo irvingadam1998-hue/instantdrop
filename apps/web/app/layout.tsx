@@ -23,10 +23,17 @@ export const metadata: Metadata = {
   title: 'InstantDrop — Compartir archivos por WiFi sin instalación',
   description:
     'Comparte archivos y texto entre cualquier dispositivo en la misma red WiFi. Sin cuentas, sin cables, sin nube.',
-  robots: process.env.NODE_ENV === 'production' ? 'index,follow' : 'noindex,nofollow,noarchive',
+  robots:
+    process.env.NODE_ENV === 'production'
+      ? 'index,follow'
+      : 'noindex,nofollow,noarchive',
 }
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode
+}) {
   return (
     <html lang="es" className={`${dmSans.variable} ${dmMono.variable}`}>
       <body>
