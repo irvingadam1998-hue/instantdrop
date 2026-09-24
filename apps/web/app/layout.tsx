@@ -1,21 +1,15 @@
 import type { Metadata } from 'next'
-import Script from 'next/script'
-import { DM_Sans, DM_Mono } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
-import { SpeedInsights } from '@vercel/speed-insights/next'
+import { Onest, DM_Mono } from 'next/font/google'
 import { I18nProvider } from '@/lib/i18n'
+import { SITE_URL } from '@/lib/seo'
 import './globals.css'
 
-// Same publisher ID that's declared in public/ads.txt. Keeping both in sync
-// matters: AdSense's "Misrepresentative content" review flags ads.txt entries
-// that don't correspond to an actual, verifiable ad implementation on the
-// live site — which was the case here (ads.txt existed, but no adsbygoogle
-// script or verification tag was ever present on the deployed page).
+// Keep this publisher ID aligned with the AdSense account and public/ads.txt.
 const ADSENSE_PUBLISHER_ID = 'ca-pub-7739241937608835'
 
-const dmSans = DM_Sans({
+const dmSans = Onest({
   subsets: ['latin'],
-  weight: ['300', '400', '500', '600'],
+  weight: ['400', '500', '600', '700'],
   variable: '--font-dm-sans',
   display: 'swap',
 })
@@ -28,16 +22,53 @@ const dmMono = DM_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'InstantDrop — Compartir archivos por WiFi sin instalación',
+  metadataBase: SITE_URL,
+  title: {
+    default: 'InstantDrop — compartir archivos entre dispositivos',
+    template: '%s | InstantDrop',
+  },
   description:
-    'Comparte archivos y texto entre cualquier dispositivo en la misma red WiFi. Sin cuentas, sin cables, sin nube.',
-  robots:
-    process.env.NODE_ENV === 'production'
-      ? 'index,follow'
-      : 'noindex,nofollow,noarchive',
-  // Google's preferred, crawler-visible way to confirm this site belongs to
-  // the AdSense account in ads.txt — doesn't depend on JS executing at all.
+    'Envía archivos entre móvil y computadora con InstantDrop. Conecta dispositivos cercanos y transfiere por WebRTC desde el navegador, sin crear una cuenta.',
+  applicationName: 'InstantDrop',
+  category: 'utilities',
+  alternates: { canonical: '/' },
+  robots: {
+    index: process.env.NODE_ENV === 'production',
+    follow: process.env.NODE_ENV === 'production',
+    googleBot: { index: process.env.NODE_ENV === 'production', follow: process.env.NODE_ENV === 'production', 'max-image-preview': 'large', 'max-snippet': -1, 'max-video-preview': -1 },
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'es_PA',
+    siteName: 'InstantDrop',
+    url: '/',
+    title: 'InstantDrop — compartir archivos entre dispositivos',
+    description: 'Envía archivos entre móvil y computadora con una conexión WebRTC desde el navegador.',
+    images: ['/logo.png'],
+  },
+  twitter: { card: 'summary_large_image', images: ['/logo.png'] },
+  icons: { icon: '/favicon.ico', shortcut: '/favicon.ico' },
+  referrer: 'strict-origin-when-cross-origin',
+  // AdSense supports this meta tag as a site-ownership verification method.
   other: { 'google-adsense-account': ADSENSE_PUBLISHER_ID },
+}
+
+const structuredData = {
+  '@context': 'https://schema.org',
+  '@graph': [
+    { '@type': 'WebSite', name: 'InstantDrop', url: SITE_URL.toString(), inLanguage: 'es' },
+    {
+      '@type': 'SoftwareApplication',
+      name: 'InstantDrop',
+      url: SITE_URL.toString(),
+      applicationCategory: 'UtilitiesApplication',
+      operatingSystem: 'Any device with a modern web browser',
+      browserRequirements: 'JavaScript and WebRTC support',
+      isAccessibleForFree: true,
+      offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      description: 'Aplicación web gratuita para compartir archivos entre navegadores mediante WebRTC.',
+    },
+  ],
 }
 
 export default function RootLayout({
@@ -48,17 +79,8 @@ export default function RootLayout({
   return (
     <html lang="es" className={`${dmSans.variable} ${dmMono.variable}`}>
       <body>
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData).replace(/</g, '\\u003c') }} />
         <I18nProvider>{children}</I18nProvider>
-        <Analytics />
-        <SpeedInsights />
-        {process.env.NODE_ENV === 'production' && (
-          <Script
-            async
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${ADSENSE_PUBLISHER_ID}`}
-            crossOrigin="anonymous"
-            strategy="afterInteractive"
-          />
-        )}
       </body>
     </html>
   )

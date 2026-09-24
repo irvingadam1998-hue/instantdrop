@@ -13,21 +13,16 @@ apps/
 ## Cómo funciona
 
 - Cada dispositivo se registra con un `deviceId`, un `token` aleatorio, un `emoji` y una `roomId`.
-- Los dispositivos de la misma **room** (o de la misma red local como fallback) se descubren entre sí.
+- Los dispositivos que comparten una red aparecen al conectarse. Las pestañas de cada navegador comparten su identidad.
 - Los archivos viajan **directo entre navegadores vía WebRTC (P2P)** — el servidor nunca los toca ni los almacena.
 - El servidor solo hace **señalización** (intercambio de ofertas/respuestas SDP e ICE por SSE) y guarda **clips de texto en memoria**, agrupados por room.
 - Un código QR permite unirse rápido desde otro dispositivo escaneando la URL del frontend.
 
-## Estabilidad de la room en producción
+## Detección de dispositivos
 
-La resolución de room (`apps/server/src/config.js#getRoomKey`) sigue este orden, para que nunca dependa de forma insegura de la IP del cliente:
+La lista solo incluye navegadores con una conexión activa. Se actualiza al instante al abrirse o cerrarse una pestaña; una comprobación frecuente retira las conexiones que se pierden junto con la red. Las pestañas del mismo navegador comparten su identidad y aparecen como un único dispositivo.
 
-1. `roomId` explícito en la petición (código compartido por el usuario).
-2. `APP_ROOM_ID` — fija todo el tráfico de este deployment a una sola room, sin importar el dominio.
-3. Un identificador derivado del **hostname del backend** (`Host`/`X-Forwarded-Host`), estable en cualquier dominio público.
-4. Como último recurso, el subnet del cliente (uso puramente LAN, sin dominio ni `APP_ROOM_ID`).
-
-`X-Forwarded-For` **nunca** se usa para decidir la room — solo se usa (de forma segura, detrás del proxy de Render) para rate limiting y para el fallback LAN del punto 4.
+La detección automática usa la dirección de red de cada equipo. En redes públicas o compartidas, escribe el mismo código de sala en ambos dispositivos para encontrarlos. No configures una sala global para todos los visitantes del sitio.
 
 ## Requisitos
 
@@ -51,7 +46,6 @@ Abre `http://localhost:3000` — o `http://<tu-IP-local>:3000` desde otro dispos
 |----------------|------------------------------------------------------------------------------|
 | `PORT`         | Puerto del servidor (Render lo define automáticamente)                       |
 | `NODE_ENV`     | `production` \| `development`                                                |
-| `APP_ROOM_ID`  | Fija la room de todo el deployment. Recomendado en producción.               |
 | `FRONTEND_URL` | Origen(es) del frontend desplegado, separados por coma — usado para CORS.    |
 
 ### `apps/web/.env`
@@ -69,7 +63,7 @@ Este proyecto **no usa Vercel** ni variables específicas de Railway. Usa `rende
 
 1. Conecta el repo en Render y crea el Blueprint a partir de `render.yaml`.
 2. Se crean dos Web Services: `instantdrop-server` y `instantdrop-web`.
-3. Configura `APP_ROOM_ID` (opcional pero recomendado) y `FRONTEND_URL` en `instantdrop-server` con la URL pública que Render asigne a `instantdrop-web`.
+3. Configura `FRONTEND_URL` en `instantdrop-server` con la URL pública que Render asigne a `instantdrop-web`.
 4. Configura `NEXT_PUBLIC_SERVER_URL` en `instantdrop-web` con la URL pública de `instantdrop-server`.
 5. Redeploy manual de `instantdrop-web` para que el build tome el nuevo `NEXT_PUBLIC_SERVER_URL` (Next.js lo inyecta en build time, no en runtime).
 
@@ -96,6 +90,14 @@ Si en algún momento se despliega `apps/web` en Vercel, solo hace falta apuntar 
 - Headers de seguridad (`X-Content-Type-Options`, `X-Frame-Options`, CSP, HSTS en producción).
 - CORS explícito por origen (`FRONTEND_URL`), sin comodines en producción.
 - El servidor jamás recibe ni almacena el contenido de archivos — solo señalización y clips de texto efímeros en memoria.
+
+## Indexación y AdSense
+
+- `NEXT_PUBLIC_SITE_URL` define el dominio canónico y alimenta los metadatos, `robots.txt` y `sitemap.xml`; por defecto es `https://instantdrop.site`.
+- Tras desplegar el dominio definitivo, verifica la propiedad en Google Search Console y envía `https://instantdrop.site/sitemap.xml`. El sitemap incluye solo páginas públicas; las salas y la API no se indexan.
+- La etiqueta meta de AdSense y `apps/web/public/ads.txt` permiten la verificación del sitio. Confirma que el publisher ID coincida exactamente con la cuenta que solicita aprobación.
+- No se cargan anuncios en la herramienta de transferencia: el intercambio de archivos y mensajes privados es la función principal de la pantalla, y AdSense restringe anuncios en pantallas centradas en comunicación privada. Antes de mostrar anuncios en páginas editoriales, se requiere aprobación de AdSense; para anuncios personalizados en EEE, Reino Unido o Suiza, configura una CMP certificada por Google.
+- La indexación técnica no garantiza posiciones concretas. El posicionamiento depende de la utilidad y originalidad del contenido, la experiencia y las señales de confianza; evita crear páginas repetidas solo para captar palabras clave.
 
 ## Empaquetado Arch/Manjaro (`packaging/arch`)
 

@@ -1,11 +1,12 @@
 const os = require('os')
+const { createHash } = require('crypto')
 
 const IS_PRODUCTION = ['production', 'prod'].includes(
   (process.env.APP_ENV || process.env.NODE_ENV || '').toLowerCase()
 )
 
 const PORT = process.env.PORT || 4000
-const DEVICE_TIMEOUT_MS = 30_000
+const DEVICE_TIMEOUT_MS = 15_000
 
 const EMOJIS = [
   '🐶',
@@ -48,7 +49,12 @@ const FRONTEND_ORIGINS = (process.env.FRONTEND_URL || '')
   .filter(Boolean)
 
 function getLocalIP() {
-  const ifaces = os.networkInterfaces()
+  let ifaces
+  try {
+    ifaces = os.networkInterfaces()
+  } catch {
+    return '127.0.0.1'
+  }
   const skip =
     /virtual|vmware|vbox|hyper|vethernet|loopback|bluetooth|tunnel|tap|tun/i
   const prefer = /wi.?fi|wlan|wireless/i
@@ -121,56 +127,17 @@ function normalizeRoomId(raw) {
   return value || null
 }
 
-// Stable room resolution — the core of production reliability:
-//   1. Explicit roomId from the request always wins (lets users share a code).
-//   2. APP_ROOM_ID pins every client hitting this deployment to one fixed room.
-//      Set this on Render so the room never shifts under a shared/public domain.
-//   3. LAN subnet for private IPs — ensures two devices on the same WiFi/network
-//      automatically discover each other, even when accessing via public domain.
-//   4. A per-hostname key for public IPs from different networks.
-//   5. LAN subnet as fallback for any other case.
+// Automatic discovery is scoped to a network, never to the public website.
+// Only an explicit code can cross networks.
 function getRoomKey(req, roomId) {
   const explicit = normalizeRoomId(roomId)
   if (explicit) return `room:${explicit}`
 
-  const forced = normalizeRoomId(process.env.APP_ROOM_ID)
-  if (forced) return `room:${forced}`
-
-  // Priority: LAN/private subnet first (ensures same-WiFi discovery)
-  const clientIP = getClientIP(req)
-  if (
-    clientIP &&
-    clientIP !== '127.0.0.1' &&
-    clientIP !== '::1' &&
-    isPrivateIP(clientIP)
-  ) {
-    return `lan:${clientSubnet(req)}`
-  }
-
-  // Fall back to hostname-based room for public IPs
-  const host = (
-    (req.headers['x-forwarded-host'] || req.headers.host || '') + ''
-  )
-    .split(',')[0]
-    .split(':')[0]
-    .toLowerCase()
-  const isLocalHost =
-    !host || /^(localhost|127\.0\.0\.1|0\.0\.0\.0)$/.test(host)
-  if (!isLocalHost) {
-    const siteKey = host
-      .replace(/^www\./, '')
-      .replace(/[^a-z0-9]/g, '')
-      .slice(0, 18)
-      .toUpperCase()
-    if (siteKey) return `room:AUTO-${siteKey}`
-  }
-
-  return `lan:${clientSubnet(req)}`
+  const network = createHash('sha256').update(clientSubnet(req)).digest('hex').slice(0, 12).toUpperCase()
+  return `room:NET-${network}`
 }
 
-// The `room:` prefix means the key came from an explicit code, APP_ROOM_ID, or
-// the deployment's own hostname — all shareable/displayable. `lan:` is derived
-// from a client IP subnet and isn't a meaningful code to show a user.
+// Automatic network rooms receive a shareable, opaque label as well.
 function getRoomDisplayLabel(roomKey) {
   return roomKey.startsWith('room:') ? roomKey.slice('room:'.length) : null
 }

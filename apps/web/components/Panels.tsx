@@ -10,7 +10,7 @@ export function UploadOverlay({ overlay, onCancel }: { overlay: OverlayState; on
   return (
     <div id="upload-overlay" className={overlay.open ? 'open' : ''}>
       <div className="upload-box">
-        <div style={{ position: 'relative', width: 80, height: 80, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="upload-indicator">
           <div className="upload-ring" />
           <span className="upload-pct">{overlay.pct}</span>
         </div>

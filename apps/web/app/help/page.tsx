@@ -21,6 +21,7 @@ export default function HelpPage() {
     <ContentPage>
       <div className="content-hero">
         <h1>{t('help.title')}</h1>
+        <p>{t('help.lead')}</p>
       </div>
 
       <div className="section">
@@ -48,6 +49,12 @@ export default function HelpPage() {
       </div>
 
       <div className="section">
+        <h2>{t('help.connection.title')}</h2>
+        <p>{t('help.connection.p1')}</p>
+        <p>{t('help.connection.p2')}</p>
+      </div>
+
+      <div className="section">
         <h2>{t('help.limits.title')}</h2>
         <table className="limits-table">
           <tbody>
@@ -72,16 +79,9 @@ export default function HelpPage() {
       </div>
 
       <div className="section">
-        <h2>{t('help.install.title')}</h2>
-        <p>{t('help.install.body')}</p>
-        <p>{t('help.install.aur')}</p>
-        <pre className="code-block">yay -S instantdrop-git</pre>
-        <p>{t('help.install.manual')}</p>
-        <pre className="code-block">
-          git clone https://github.com/irvingadam1998-hue/instantdrop.git{'\n'}
-          cd instantdrop/packaging/arch{'\n'}
-          makepkg -si
-        </pre>
+        <h2>{t('help.troubleshooting.title')}</h2>
+        <p>{t('help.troubleshooting.p1')}</p>
+        <p>{t('help.troubleshooting.p2')}</p>
       </div>
 
       <div className="section">

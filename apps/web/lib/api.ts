@@ -3,6 +3,7 @@ import { getServerBaseUrl } from './config'
 export interface RegisterResponse {
   deviceId: string
   emoji: string
+  name: string
   token: string
   roomId: string | null
   deploymentId?: string
@@ -11,6 +12,8 @@ export interface RegisterResponse {
 export interface Device {
   id: string
   emoji: string
+  name: string
+  sessionId?: string
 }
 
 export interface Clip {
@@ -42,6 +45,7 @@ export function register(payload: {
   deviceId?: string | null
   token?: string | null
   roomId?: string
+  name?: string
 }) {
   return postJson<RegisterResponse>('/api/register', payload)
 }
@@ -49,6 +53,7 @@ export function register(payload: {
 export function heartbeat(payload: {
   deviceId: string
   token: string
+  sessionId: string
   roomId?: string
 }) {
   return postJson<{ ok: boolean }>('/api/heartbeat', payload)
@@ -58,8 +63,19 @@ export async function fetchDevices(
   me: string,
   roomId?: string
 ): Promise<Device[]> {
-  const res = await fetch(url('/api/devices', { me, roomId }))
-  return res.json()
+  const res = await fetch(url('/api/devices', { me, roomId }), { cache: 'no-store' })
+  if (!res.ok) throw new Error('No se pudieron cargar los dispositivos')
+  const payload: unknown = await res.json()
+  if (!Array.isArray(payload)) return []
+  const unique = new Map<string, Device>()
+  for (const value of payload) {
+    if (value && typeof value.id === 'string' && typeof value.emoji === 'string') {
+      unique.set(value.id, { id: value.id, emoji: value.emoji,
+        name: typeof value.name === 'string' ? value.name : '',
+        sessionId: typeof value.sessionId === 'string' ? value.sessionId : undefined })
+    }
+  }
+  return [...unique.values()]
 }
 
 export async function fetchQr(
@@ -76,12 +92,14 @@ export function sendSignal(payload: {
   type: string
   data: unknown
   roomId?: string
+  sessionId: string
+  toSessionId?: string
 }) {
   return postJson<{ ok: boolean }>('/api/signal', payload)
 }
 
-export function eventsUrl(deviceId: string, token: string, roomId?: string) {
-  return url('/api/events', { deviceId, token, roomId })
+export function eventsUrl(deviceId: string, token: string, roomId: string | undefined, sessionId: string) {
+  return url('/api/events', { deviceId, token, roomId, sessionId })
 }
 
 export async function fetchClips(roomId?: string): Promise<Clip[]> {

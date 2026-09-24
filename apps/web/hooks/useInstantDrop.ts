@@ -13,8 +13,8 @@ const MAX_FILE_SIZE = 500 * 1024 * 1024 // 500 MB
 const CHUNK_SIZE = 256 * 1024
 const HIGH_WATER = 4 * 1024 * 1024
 const LOW_WATER = 512 * 1024
-const POLL_INTERVAL_MS = 3000
-const HEARTBEAT_INTERVAL_MS = 10_000
+const CLIP_POLL_INTERVAL_MS = 15_000
+const HEARTBEAT_INTERVAL_MS = 5000
 
 export interface OverlayState {
   open: boolean
@@ -37,11 +37,11 @@ export function useInstantDrop() {
   const [myEmoji, setMyEmoji] = useState('··')
   const [myRoomId, setMyRoomIdState] = useState('')
   const [ready, setReady] = useState(false)
-  const [deploymentId, setDeploymentId] = useState<string | null>(null)
   const [esConnected, setEsConnected] = useState(false)
 
   // ── Network state ──
   const [devices, setDevices] = useState<Device[]>([])
+  const [devicesLoading, setDevicesLoading] = useState(true)
   const [clips, setClips] = useState<Clip[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [isBusy, setIsBusy] = useState(false)
@@ -75,6 +75,11 @@ export function useInstantDrop() {
   const deviceEmojis = useRef(new Map<string, string>())
   const incomingDCRef = useRef<RTCDataChannel | null>(null)
   const esRef = useRef<EventSource | null>(null)
+  const sessionIdRef = useRef('')
+  const registerPromiseRef = useRef<Promise<api.RegisterResponse> | null>(null)
+  const deviceSessionsRef = useRef(new Map<string, string>())
+  const deviceRevisionRef = useRef(0)
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const esDelayRef = useRef(3000)
   const esRecoveringRef = useRef(false)
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(
@@ -88,37 +93,31 @@ export function useInstantDrop() {
   }, [])
 
   // ── Registration ──
-  const register = useCallback(async () => {
-    const res = await api.register({
-      deviceId: myDeviceIdRef.current || undefined,
-      token: myTokenRef.current || undefined,
+  const register = useCallback(() => {
+    if (registerPromiseRef.current) return registerPromiseRef.current
+    const { deviceId, token } = deviceStorage.ensureCredentials()
+    const request = api.register({
+      deviceId,
+      token,
+      name: deviceStorage.getDeviceName(),
       roomId: myRoomIdRef.current || undefined,
-    })
-
-    // Detect deployment change and clear stale credentials
-    const storedDeploymentId = deviceStorage.getDeploymentId()
-    if (
-      res.deploymentId &&
-      storedDeploymentId &&
-      res.deploymentId !== storedDeploymentId
-    ) {
-      deviceStorage.clear()
-    }
-
-    setMyDeviceId(res.deviceId)
-    setMyToken(res.token)
-    setMyEmoji(res.emoji)
-    setDeploymentId(res.deploymentId || null)
-    const resolvedRoomId = normalizeRoomId(res.roomId || myRoomIdRef.current)
-    setMyRoomIdState(resolvedRoomId)
-    deviceStorage.save({
-      deviceId: res.deviceId,
-      token: res.token,
-      emoji: res.emoji,
-      roomId: resolvedRoomId,
-      deploymentId: res.deploymentId,
-    })
-    return res
+    }).then((res) => {
+      const previousDeployment = deviceStorage.getDeploymentId()
+      if (res.deploymentId && previousDeployment && res.deploymentId !== previousDeployment) {
+        deviceStorage.clear()
+      }
+      setMyDeviceId(res.deviceId)
+      setMyToken(res.token)
+      setMyEmoji(res.emoji)
+      const room = normalizeRoomId(res.roomId || myRoomIdRef.current)
+      myRoomIdRef.current = room
+      setMyRoomIdState(room)
+      deviceStorage.save({ deviceId: res.deviceId, token: res.token, emoji: res.emoji,
+        roomId: deviceStorage.getRoomId(), deploymentId: res.deploymentId })
+      return res
+    }).finally(() => { registerPromiseRef.current = null })
+    registerPromiseRef.current = request
+    return request
   }, [])
 
   const setMyRoomId = useCallback((value: string) => {
@@ -132,30 +131,38 @@ export function useInstantDrop() {
   }, [])
 
   // ── Devices & clips polling ──
-  const loadDevices = useCallback(async () => {
-    if (!myDeviceIdRef.current) return
-    const list = await api.fetchDevices(
-      myDeviceIdRef.current,
-      myRoomIdRef.current || undefined
-    )
-    list.forEach((d) => deviceEmojis.current.set(d.id, d.emoji))
-    setDevices(list)
+  const applyDevices = useCallback((list: Device[]) => {
+    deviceRevisionRef.current += 1
+    const unique = [...new Map(list.map((d) => [d.id, d])).values()]
+    unique.forEach((d) => deviceEmojis.current.set(d.id, d.emoji))
+    deviceSessionsRef.current = new Map(unique.map((d) => [d.id, d.sessionId || '']))
+    setDevices(unique)
+    setDevicesLoading(false)
     if (
       selectedIdRef.current &&
-      !list.find((d) => d.id === selectedIdRef.current)
+      !unique.find((d) => d.id === selectedIdRef.current)
     ) {
       setSelectedId(null)
     }
   }, [])
+
+  const loadDevices = useCallback(async () => {
+    if (!myDeviceIdRef.current) return
+    const revision = ++deviceRevisionRef.current
+    try {
+      const list = await api.fetchDevices(myDeviceIdRef.current, myRoomIdRef.current || undefined)
+      if (revision === deviceRevisionRef.current) applyDevices(list)
+    } catch {
+      setDevicesLoading(false)
+    }
+  }, [applyDevices])
 
   const loadClips = useCallback(async () => {
     const list = await api.fetchClips(myRoomIdRef.current || undefined)
     setClips(list)
   }, [])
 
-  const poll = useCallback(async () => {
-    await Promise.all([loadDevices(), loadClips()])
-  }, [loadDevices, loadClips])
+  const poll = loadClips
 
   // ── WebRTC signaling ──
   const signal = useCallback(
@@ -167,6 +174,8 @@ export function useInstantDrop() {
         type,
         data,
         roomId: myRoomIdRef.current || undefined,
+        sessionId: sessionIdRef.current,
+        toSessionId: deviceSessionsRef.current.get(to),
       })
     },
     []
@@ -413,6 +422,7 @@ export function useInstantDrop() {
   )
 
   const connectEvents = useCallback(() => {
+    clearTimeout(reconnectTimerRef.current)
     if (esRef.current) {
       esRef.current.close()
       esRef.current = null
@@ -424,7 +434,8 @@ export function useInstantDrop() {
       api.eventsUrl(
         myDeviceIdRef.current,
         myTokenRef.current,
-        myRoomIdRef.current || undefined
+        myRoomIdRef.current || undefined,
+        sessionIdRef.current
       )
     )
     esRef.current = es
@@ -433,11 +444,13 @@ export function useInstantDrop() {
       setEsConnected(true)
       esDelayRef.current = 3000
       esRecoveringRef.current = false
+      void loadDevices().catch(() => {})
     }
 
     es.onmessage = async (e) => {
       esDelayRef.current = 3000
-      const { from, type, data } = JSON.parse(e.data)
+      const { from, type, data, sessionId } = JSON.parse(e.data)
+      if (from && sessionId) deviceSessionsRef.current.set(from, sessionId)
 
       if (type === 'offer') {
         const pc = createPC(from, false)
@@ -456,14 +469,30 @@ export function useInstantDrop() {
       }
     }
 
+    es.addEventListener('devices', ((event: MessageEvent<string>) => {
+      try { applyDevices(JSON.parse(event.data)) } catch { /* Ignore malformed updates. */ }
+    }) as EventListener)
+
+    es.addEventListener('ping', () => {
+      void api.heartbeat({
+        deviceId: myDeviceIdRef.current,
+        token: myTokenRef.current,
+        roomId: myRoomIdRef.current || undefined,
+        sessionId: sessionIdRef.current,
+      }).then((res) => {
+        if (!res.ok) void register().then(connectEvents)
+      }).catch(() => {})
+    })
+
     es.onerror = () => {
+      if (esRef.current !== es) return
       setEsConnected(false)
       es.close()
       esRef.current = null
-      setTimeout(connectEvents, esDelayRef.current)
-      esDelayRef.current = Math.min(esDelayRef.current * 2, 20000)
+      reconnectTimerRef.current = setTimeout(connectEvents, esDelayRef.current)
+      esDelayRef.current = Math.min(esDelayRef.current * 1.5, 8000)
     }
-  }, [createPC, signal])
+  }, [applyDevices, createPC, loadDevices, register, signal])
 
   // ── Public actions ──
   const validateFiles = useCallback(
@@ -618,6 +647,10 @@ export function useInstantDrop() {
 
   const changeRoom = useCallback(
     async (value: string) => {
+      deviceRevisionRef.current += 1
+      setDevicesLoading(true)
+      esRef.current?.close()
+      esRef.current = null
       setMyRoomId(value)
       await register()
       await loadDevices()
@@ -626,13 +659,30 @@ export function useInstantDrop() {
     [connectEvents, loadDevices, register, setMyRoomId]
   )
 
+  useEffect(() => {
+    const onStoredRoomChange = (event: StorageEvent) => {
+      if (event.key !== 'InstantDrop-roomId' && event.key !== null) return
+      const room = deviceStorage.getRoomId()
+      if (room === myRoomIdRef.current) return
+      void changeRoom(room).catch(() => {
+        setDevices([])
+        setDevicesLoading(false)
+      })
+    }
+    window.addEventListener('storage', onStoredRoomChange)
+    return () => window.removeEventListener('storage', onStoredRoomChange)
+  }, [changeRoom])
+
   // ── Init ──
   useEffect(() => {
-    setMyDeviceId(deviceStorage.getDeviceId() || '')
-    setMyToken(deviceStorage.getToken() || '')
+    const identity = deviceStorage.ensureCredentials()
+    myDeviceIdRef.current = identity.deviceId
+    myTokenRef.current = identity.token
+    sessionIdRef.current = deviceStorage.getSessionId()
+    setMyDeviceId(identity.deviceId)
+    setMyToken(identity.token)
     setMyEmoji(deviceStorage.getEmoji())
     setMyRoomIdState(deviceStorage.getRoomId())
-    setDeploymentId(deviceStorage.getDeploymentId())
     setReady(true)
   }, [])
 
@@ -640,16 +690,18 @@ export function useInstantDrop() {
     if (!ready) return
     let cancelled = false
     let heartbeatId: ReturnType<typeof setInterval>
-    let pollId: ReturnType<typeof setInterval>
+    let clipPollId: ReturnType<typeof setInterval>
     ;(async () => {
       await register()
+      if (cancelled) return
       await loadQr()
+      if (cancelled) return
       connectEvents()
-      await poll()
+      await Promise.all([loadDevices(), poll()])
       // Guards against a Strict Mode dev double-invoke: if this effect was
       // already torn down before this async chain finished, don't leak an
       // interval that the (already-run) cleanup above will never see.
-      if (!cancelled) pollId = setInterval(poll, POLL_INTERVAL_MS)
+      if (!cancelled) clipPollId = setInterval(poll, CLIP_POLL_INTERVAL_MS)
     })()
 
     heartbeatId = setInterval(async () => {
@@ -658,9 +710,12 @@ export function useInstantDrop() {
           deviceId: myDeviceIdRef.current,
           token: myTokenRef.current,
           roomId: myRoomIdRef.current || undefined,
+          sessionId: sessionIdRef.current,
         })
         if (!res.ok) {
           await register()
+          connectEvents()
+        } else if (!esRef.current || esRef.current.readyState === EventSource.CLOSED) {
           connectEvents()
         }
       } catch {
@@ -669,16 +724,21 @@ export function useInstantDrop() {
     }, HEARTBEAT_INTERVAL_MS)
 
     const onVisibility = () => {
-      if (!document.hidden) poll()
+      if (!document.hidden) {
+        void Promise.all([loadDevices(), poll()])
+        if (!esRef.current || esRef.current.readyState === EventSource.CLOSED) connectEvents()
+      }
     }
     document.addEventListener('visibilitychange', onVisibility)
 
     return () => {
       cancelled = true
       clearInterval(heartbeatId)
-      clearInterval(pollId)
+      clearInterval(clipPollId)
+      clearTimeout(reconnectTimerRef.current)
       document.removeEventListener('visibilitychange', onVisibility)
       esRef.current?.close()
+      esRef.current = null
       peerConnections.current.forEach((pc) => pc.close())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -690,6 +750,8 @@ export function useInstantDrop() {
     myEmoji,
     myRoomId,
     devices,
+    devicesLoading,
+    isConnected: esConnected,
     clips,
     selectedId,
     isBusy,
