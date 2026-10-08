@@ -2,12 +2,13 @@
 
 Comparte archivos y texto entre dispositivos en la misma red WiFi — sin login, sin base de datos, sin nube.
 
-Monorepo con dos aplicaciones independientes:
+Monorepo con tres aplicaciones independientes:
 
 ```
 apps/
   server/   Backend Node.js + Express — señalización WebRTC y clips de texto en memoria
   web/      Frontend Next.js (App Router) — toda la UI e interacción con el usuario
+  mobile/   App nativa React Native CLI para Android e iOS (sin Expo)
 ```
 
 ## Cómo funciona
@@ -38,6 +39,10 @@ npm run dev          # levanta server (puerto 4000) y web (puerto 3000) en paral
 
 Abre `http://localhost:3000` — o `http://<tu-IP-local>:3000` desde otro dispositivo en la misma WiFi. El frontend detecta automáticamente la IP del backend a partir del hostname con el que abriste la página (ver `apps/web/lib/config.ts`), así que no hace falta configurar nada para probar en red local.
 
+### Aplicación móvil (React Native sin Expo)
+
+La app nativa vive en `apps/mobile`. Ejecuta `npm run mobile:start` y, en otra terminal, `npm run mobile:android` o `npm run mobile:ios` (iOS requiere macOS y Xcode). En el teléfono, configura en la pantalla la URL del backend Express; para desarrollo local usa la IP LAN del equipo y el puerto `4000`. Consulta [apps/mobile/README.md](apps/mobile/README.md) para requisitos y detalles.
+
 ## Variables de entorno
 
 ### `apps/server/.env`
@@ -53,6 +58,8 @@ Abre `http://localhost:3000` — o `http://<tu-IP-local>:3000` desde otro dispos
 | Variable                  | Descripción                                                                 |
 |---------------------------|------------------------------------------------------------------------------|
 | `NEXT_PUBLIC_SERVER_URL`  | URL pública del backend. **Requerido en producción** (se inyecta en build).  |
+| `NEXT_PUBLIC_APP_ENV` | Debe ser `production` o `prod` únicamente en el dominio real. Habilita indexación y sitemap públicos. |
+| `NEXT_PUBLIC_GA_MEASUREMENT_ID` | ID de medición de GA4 (`G-…`). Analytics se carga solo junto con el entorno de producción. |
 | `NEXT_PUBLIC_SERVER_PORT` | Puerto del backend, solo como fallback en desarrollo/LAN (default `4000`).   |
 
 Copia `apps/server/.env.example` y `apps/web/.env.example` a `.env` en cada carpeta para empezar.
@@ -65,7 +72,8 @@ Este proyecto **no usa Vercel** ni variables específicas de Railway. Usa `rende
 2. Se crean dos Web Services: `instantdrop-server` y `instantdrop-web`.
 3. Configura `FRONTEND_URL` en `instantdrop-server` con la URL pública que Render asigne a `instantdrop-web`.
 4. Configura `NEXT_PUBLIC_SERVER_URL` en `instantdrop-web` con la URL pública de `instantdrop-server`.
-5. Redeploy manual de `instantdrop-web` para que el build tome el nuevo `NEXT_PUBLIC_SERVER_URL` (Next.js lo inyecta en build time, no en runtime).
+5. Configura `NEXT_PUBLIC_APP_ENV=production` y `NEXT_PUBLIC_SITE_URL` con el dominio canónico en `instantdrop-web`.
+6. Redeploy manual de `instantdrop-web` para que el build tome los nuevos `NEXT_PUBLIC_*` (Next.js los inyecta en build time, no en runtime).
 
 También puedes crear los dos servicios a mano sin Blueprint, usando los `buildCommand`/`startCommand` que aparecen en `render.yaml` como referencia.
 

@@ -72,6 +72,7 @@ export function useInstantDrop() {
   const peerConnections = useRef(new Map<string, RTCPeerConnection>())
   const pendingFiles = useRef(new Map<string, File[]>())
   const pendingTexts = useRef(new Map<string, string>())
+  const pendingTextTimeouts = useRef(new Map<string, ReturnType<typeof setTimeout>>())
   const deviceEmojis = useRef(new Map<string, string>())
   const incomingDCRef = useRef<RTCDataChannel | null>(null)
   const esRef = useRef<EventSource | null>(null)
@@ -89,7 +90,7 @@ export function useInstantDrop() {
   const toast = useCallback((msg: string) => {
     setToastMsg(msg)
     clearTimeout(toastTimerRef.current)
-    toastTimerRef.current = setTimeout(() => setToastMsg(null), 2500)
+    toastTimerRef.current = setTimeout(() => setToastMsg(null), 3500)
   }, [])
 
   // ── Registration ──
@@ -241,15 +242,18 @@ export function useInstantDrop() {
     (dc: RTCDataChannel, peerId: string) => {
       if (pendingTexts.current.has(peerId)) {
         const text = pendingTexts.current.get(peerId)!
-        pendingTexts.current.delete(peerId)
         dc.send(JSON.stringify({ type: 'text', content: text }))
-        hideOverlay()
-        toast(t('toast.text_sent'))
-        dc.close()
-        setTimeout(() => {
+        const timeout = setTimeout(() => {
+          if (pendingTexts.current.get(peerId) !== text) return
+          pendingTexts.current.delete(peerId)
+          pendingTextTimeouts.current.delete(peerId)
+          hideOverlay()
+          toast(t('toast.transfer_err'))
+          dc.close()
           peerConnections.current.get(peerId)?.close()
           peerConnections.current.delete(peerId)
-        }, 800)
+        }, 10_000)
+        pendingTextTimeouts.current.set(peerId, timeout)
         return
       }
 
@@ -299,7 +303,10 @@ export function useInstantDrop() {
             return
           }
           if (msg.type === 'text') {
-            if (typeof msg.content === 'string') setRecvText(msg.content)
+            if (typeof msg.content === 'string' && msg.content.length <= 10_000) {
+              setRecvText(msg.content)
+              dc.send(JSON.stringify({ type: 'text-ack' }))
+            }
             return
           }
           if (msg.type === 'request') {
@@ -392,6 +399,18 @@ export function useInstantDrop() {
             const msg = JSON.parse(e.data)
             if (msg.type === 'accept') {
               startActualTransfer(dc, peerId)
+            } else if (msg.type === 'text-ack') {
+              const timeout = pendingTextTimeouts.current.get(peerId)
+              if (timeout) clearTimeout(timeout)
+              pendingTextTimeouts.current.delete(peerId)
+              pendingTexts.current.delete(peerId)
+              hideOverlay()
+              toast(t('toast.text_sent'))
+              dc.close()
+              setTimeout(() => {
+                peerConnections.current.get(peerId)?.close()
+                peerConnections.current.delete(peerId)
+              }, 300)
             } else if (msg.type === 'reject') {
               pendingFiles.current.delete(peerId)
               hideOverlay()
@@ -410,6 +429,10 @@ export function useInstantDrop() {
         dc.onerror = () => {
           clearTimeout(connTimeout)
           pendingFiles.current.delete(peerId)
+          pendingTexts.current.delete(peerId)
+          const textTimeout = pendingTextTimeouts.current.get(peerId)
+          if (textTimeout) clearTimeout(textTimeout)
+          pendingTextTimeouts.current.delete(peerId)
           hideOverlay()
           toast(t('toast.transfer_err'))
         }
@@ -583,6 +606,8 @@ export function useInstantDrop() {
     peerConnections.current.clear()
     pendingFiles.current.clear()
     pendingTexts.current.clear()
+    pendingTextTimeouts.current.forEach(clearTimeout)
+    pendingTextTimeouts.current.clear()
     hideOverlay()
     toast(t('toast.cancelled'))
   }, [hideOverlay, t, toast])
@@ -715,8 +740,14 @@ export function useInstantDrop() {
         if (!res.ok) {
           await register()
           connectEvents()
-        } else if (!esRef.current || esRef.current.readyState === EventSource.CLOSED) {
-          connectEvents()
+        } else {
+          // SSE pushes changes immediately; this inexpensive poll makes
+          // discovery recover gracefully when mobile browsers briefly pause
+          // an event stream while switching apps or networks.
+          await loadDevices()
+          if (!esRef.current || esRef.current.readyState === EventSource.CLOSED) {
+            connectEvents()
+          }
         }
       } catch {
         /* network error — retried next tick */
@@ -736,6 +767,8 @@ export function useInstantDrop() {
       clearInterval(heartbeatId)
       clearInterval(clipPollId)
       clearTimeout(reconnectTimerRef.current)
+      pendingTextTimeouts.current.forEach(clearTimeout)
+      pendingTextTimeouts.current.clear()
       document.removeEventListener('visibilitychange', onVisibility)
       esRef.current?.close()
       esRef.current = null

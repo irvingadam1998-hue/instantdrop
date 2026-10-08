@@ -36,6 +36,10 @@ export function DevicesRow({
     <div className="devices-wrap" id="devices-wrap">
       <div className="devices-label"><span className={`presence-dot ${!isConnected ? 'offline' : isSearching || devices.length === 0 ? 'searching' : 'online'}`} />{label}</div>
       <div className="devices-row">
+        {devices.length === 0 && <div className={`device-empty ${isConnected ? 'is-searching' : 'is-offline'}`} role="status">
+          <span className="device-empty-indicator" />
+          <span><strong>{isConnected ? t('app.searching') : t('app.offline')}</strong><small>{t('app.tip_reload')}</small></span>
+        </div>}
         {devices.map((d) => (
           <div
             key={d.id}

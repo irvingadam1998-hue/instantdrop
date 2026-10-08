@@ -110,11 +110,26 @@ function getClientIP(req) {
 }
 
 function clientSubnet(req) {
-  const ip = getClientIP(req)
+  const ip = getClientIP(req).toLowerCase()
   if (ip === '127.0.0.1' || ip === '::1')
     return getLocalIP().split('.').slice(0, 3).join('.')
   if (isPrivateIP(ip)) return ip.split('.').slice(0, 3).join('.')
+  // Devices on the same Wi-Fi commonly receive different public IPv6
+  // addresses. A /64 is the normal IPv6 LAN allocation, so grouping by it
+  // lets a phone and a computer find each other without creating a public room.
+  if (ip.includes(':')) return ipv6NetworkPrefix(ip)
   return ip // public IP: everyone behind the same router/NAT shares this
+}
+
+function ipv6NetworkPrefix(ip) {
+  const value = ip.replace(/%.+$/, '')
+  const [left = '', right = ''] = value.split('::')
+  const leftParts = left ? left.split(':').filter(Boolean) : []
+  const rightParts = right ? right.split(':').filter(Boolean) : []
+  const missing = Math.max(0, 8 - leftParts.length - rightParts.length)
+  const parts = [...leftParts, ...Array(missing).fill('0'), ...rightParts]
+    .map((part) => part.padStart(4, '0').slice(-4))
+  return parts.slice(0, 4).join(':')
 }
 
 function normalizeRoomId(raw) {

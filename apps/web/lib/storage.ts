@@ -62,14 +62,12 @@ export const deviceStorage = {
   getRoomId: () => {
     if (!checkedRoomOnLoad) {
       checkedRoomOnLoad = true
-      const navigation = window.performance?.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
-      if (navigation?.type === 'reload') {
-        safeSet(KEYS.roomChoice, '')
-        safeSet(KEYS.roomId, '')
-        return ''
-      }
+      // Discovery is automatic for now. Remove legacy manual-room choices so
+      // an old value cannot silently isolate a device from its local network.
+      safeSet(KEYS.roomChoice, '')
+      safeSet(KEYS.roomId, '')
     }
-    return normalizeRoomId(safeGet(KEYS.roomChoice))
+    return ''
   },
   getDeploymentId: () => safeGet(KEYS.deploymentId),
   ensureCredentials() {

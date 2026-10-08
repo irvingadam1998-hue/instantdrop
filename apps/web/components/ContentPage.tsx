@@ -12,19 +12,20 @@ export function ContentPage({ children }: { children: React.ReactNode }) {
     { href: '/about', label: t('footer.about') },
     { href: '/help', label: t('footer.help') },
     { href: '/privacy', label: t('footer.privacy') },
+    { href: '/terms', label: 'Términos' },
   ]
 
   return (
     <div className="content-page">
-      <header>
+      <header className="navbar app-navbar">
         <Link href="/" className="logo">
-          InstantDrop
+          <span className="brand-mark" aria-hidden="true"><img src="/logo-instantdrop-v5.png" alt="" /></span><span className="brand-word"><b>instant</b><em>drop</em></span>
         </Link>
         <div className="header-right">
-          <button className="lang-btn" onClick={toggleLang}>
+          <button className="btn btn-sm btn-ghost lang-btn" onClick={toggleLang}>
             {lang === 'es' ? 'EN' : 'ES'}
           </button>
-          <Link href="/" className="ctrl-btn accent" style={{ width: 'auto', borderRadius: 999, padding: '0 12px', fontSize: '0.72rem' }}>
+          <Link href="/" className="btn btn-sm btn-primary ctrl-btn accent" style={{ width: 'auto', padding: '0 12px', fontSize: '0.72rem' }}>
             {t('nav.app')}
           </Link>
         </div>

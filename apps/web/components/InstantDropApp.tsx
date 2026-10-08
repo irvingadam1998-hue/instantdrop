@@ -9,6 +9,7 @@ import { DropZone } from './DropZone'
 import { DevicesRow } from './DevicesRow'
 import { PillsRow } from './PillsRow'
 import { UploadOverlay, QrPanel, TextPanel, RecvPanel, IncomingPanel, Toast } from './Panels'
+import { formatSize } from '@/lib/fileMeta'
 
 export function InstantDropApp() {
   const { t } = useI18n()
@@ -16,13 +17,14 @@ export function InstantDropApp() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [qrOpen, setQrOpen] = useState(false)
   const [textPanelOpen, setTextPanelOpen] = useState(false)
+  const [queuedFiles, setQueuedFiles] = useState<File[]>([])
 
   const selectedEmoji =
     app.selectedId != null ? app.devices.find((d) => d.id === app.selectedId)?.emoji || null : null
+  const selectedDevice = app.selectedId != null ? app.devices.find((d) => d.id === app.selectedId) : null
 
   function tryOpenFilePicker() {
     if (app.isBusy) return app.showToast(t('toast.busy'))
-    if (!app.selectedId) return app.showToast(t('toast.choose_first'))
     if (fileInputRef.current) {
       fileInputRef.current.value = ''
       fileInputRef.current.click()
@@ -36,9 +38,21 @@ export function InstantDropApp() {
 
   function onZoneDropFiles(files: File[]) {
     if (app.isBusy) return app.showToast(t('toast.busy'))
-    if (!app.selectedId) return app.showToast(t('toast.choose_first'))
     if (!app.validateFiles(files)) return
-    app.sendFiles(files, app.selectedId)
+    if (app.selectedId) app.sendFiles(files, app.selectedId)
+    else setQueuedFiles((current) => [...current, ...files])
+  }
+
+  function onDeviceSelect(id: string) {
+    if (queuedFiles.length) {
+      if (app.isBusy) return app.showToast(t('toast.busy'))
+      if (app.selectedId !== id) app.selectDevice(id)
+      const files = queuedFiles
+      setQueuedFiles([])
+      app.sendFiles(files, id)
+      return
+    }
+    app.selectDevice(id)
   }
 
   function onDeviceDropFiles(id: string, files: File[]) {
@@ -52,9 +66,9 @@ export function InstantDropApp() {
     e.target.value = ''
     if (!files.length) return
     if (app.isBusy) return app.showToast(t('toast.busy'))
-    if (!app.selectedId) return app.showToast(t('toast.no_device'))
     if (!app.validateFiles(files)) return
-    app.sendFiles(files, app.selectedId)
+    if (app.selectedId) app.sendFiles(files, app.selectedId)
+    else setQueuedFiles((current) => [...current, ...files])
   }
 
   // Global drag/drop: allow dropping a file anywhere on the page onto the
@@ -68,9 +82,9 @@ export function InstantDropApp() {
       const files = Array.from(e.dataTransfer?.files || [])
       if (!files.length) return
       if (app.isBusy) return app.showToast(t('toast.busy'))
-      if (!app.selectedId) return app.showToast(t('toast.choose_first'))
       if (!app.validateFiles(files)) return
-      app.sendFiles(files, app.selectedId)
+      if (app.selectedId) app.sendFiles(files, app.selectedId)
+      else setQueuedFiles((current) => [...current, ...files])
     }
     document.addEventListener('dragover', onDragOver)
     document.addEventListener('drop', onDrop)
@@ -93,23 +107,11 @@ export function InstantDropApp() {
     return () => document.removeEventListener('paste', onPaste)
   }, [app])
 
-  if (!app.ready) {
-    return (
-      <main className="seo-fallback">
-        <p className="workspace-kicker">INSTANTDROP</p>
-        <h1>Compartir archivos entre dispositivos, sin subirlos a la nube</h1>
-        <p>InstantDrop conecta teléfonos y computadoras para transferir archivos desde el navegador mediante WebRTC. No necesitas crear una cuenta ni instalar una aplicación.</p>
-        <p>La detección automática funciona en dispositivos de la misma red. Para redes diferentes, puedes reunirlos con un código de sala si ambos pueden conectarse al servicio.</p>
-        <Link href="/help">Guía de uso y solución de problemas</Link>
-      </main>
-    )
-  }
+  if (!app.ready) return null
 
   return (
     <div className="app-shell">
       <Header
-        roomId={app.myRoomId}
-        onRoomChange={app.changeRoom}
         onOpenQr={() => setQrOpen(true)}
         onOpenText={tryOpenTextPanel}
         onAddClick={tryOpenFilePicker}
@@ -118,61 +120,58 @@ export function InstantDropApp() {
 
       <main className="home-main">
         <div className="workspace-heading">
-          <div className="workspace-kicker"><span className="kicker-mark" />{t('app.workspace_kicker')}</div>
-          <h1>{t('app.workspace_title')}</h1>
-          <p>{t('app.workspace_subtitle')}</p>
+          <div className="workspace-title-block">
+            <div className="workspace-kicker"><span className="kicker-mark" />{t('app.workspace_kicker')}</div>
+            <h1>{t('app.workspace_title')}</h1>
+            <p>{t('app.workspace_subtitle')}</p>
+          </div>
         </div>
 
-        <section className="sharing-workspace" aria-label={t('app.workspace_title')}>
-          <aside className="device-panel">
-            <div className="device-panel-heading"><div><span className="panel-eyebrow">{t('app.devices_eyebrow')}</span><h2>{t('app.devices_title')}</h2></div><span className="device-count">{app.devices.length.toString().padStart(2, '0')}</span></div>
-            <div className="device-panel-rule" />
-            <DevicesRow
-              devices={app.devices}
-              isSearching={app.devicesLoading}
-              isConnected={app.isConnected}
-              myEmoji={app.myEmoji}
-              selectedId={app.selectedId}
-              onSelect={app.selectDevice}
-              onDropOnDevice={onDeviceDropFiles}
-            />
-          </aside>
-
-          <div className={`transfer-stage ${app.overlay.open && /\d+%/.test(app.overlay.pct) ? 'is-transferring' : ''}`}>
-            <div className="stage-topline"><span>{t('app.stage_label')}</span><span className="stage-lock"><LockIcon />{t('app.private_label')}</span></div>
-            <div className="stage-art" aria-hidden="true"><StageArtwork active={app.isConnected && app.devices.length === 0} transferring={app.overlay.open && /\d+%/.test(app.overlay.pct)} /></div>
+        <section className={`card transfer-stage elapp-hub ${app.overlay.open && /\d+%/.test(app.overlay.pct) ? 'is-transferring' : ''} ${selectedDevice ? 'has-target' : ''}`} aria-label={t('app.stage_label')}>
+          <div className="hub-topline">
+            <div><span className="hub-overline">{t('app.devices_eyebrow')}</span><h2>{t('app.orbit_title')}</h2></div>
+            <span className={`badge badge-sm hub-presence ${app.isConnected ? 'is-online' : 'is-offline'}`}><i />{app.isConnected ? app.devices.length ? t('app.connected') : t('app.searching') : t('app.offline')}</span>
+          </div>
+          <div className="hub-orbit" aria-hidden="true"><span className="hub-orbit-inner" /><span className="hub-orbit-cross">+</span></div>
+          <div className="hub-art" aria-hidden="true"><StageArtwork active={app.isConnected && app.devices.length === 0} transferring={app.overlay.open && /\d+%/.test(app.overlay.pct)} /></div>
+          <div className="hub-search" role="status" aria-live="polite">
+            <SearchGlyph />
+            <span>{selectedDevice ? `${t('app.selected')}: ${selectedDevice.name || selectedEmoji}` : app.isConnected ? t('app.searching') : t('app.offline')}</span>
+            <span className="hub-search-signal" aria-hidden="true"><i /><i /><i /></span>
+          </div>
+          <DevicesRow
+            devices={app.devices}
+            isSearching={app.devicesLoading}
+            isConnected={app.isConnected}
+            myEmoji={app.myEmoji}
+            selectedId={app.selectedId}
+            onSelect={onDeviceSelect}
+            onDropOnDevice={onDeviceDropFiles}
+          />
+          <div className="hub-center">
+            <span className="hub-center-label">{queuedFiles.length ? t('app.choose_device') : selectedDevice ? `${t('app.selected')}: ${selectedDevice.name || selectedEmoji}` : t('app.orbit_hint')}</span>
             <DropZone
               selectedEmoji={selectedEmoji}
               isDiscovering={app.isConnected && app.devices.length === 0}
               onZoneClick={tryOpenFilePicker}
               onDropFiles={onZoneDropFiles}
             />
-            <div className={`stage-footer ${app.overlay.open ? 'transfer-status' : ''}`} title={app.overlay.open ? app.overlay.label : undefined}>
-              <span className="stage-orbit-dot" />
-              {app.overlay.open && /\d+%/.test(app.overlay.pct) ? <><span className="stage-status-label">{app.overlay.label}</span><span className="stage-status-pct">{app.overlay.pct}</span></> : selectedEmoji ? t('app.ready') : app.isConnected && app.devices.length === 0 ? t('app.searching') : t('app.stage_prompt')}
-            </div>
-            {app.overlay.open && /\d+%/.test(app.overlay.pct) && <div className="stage-progress-track"><span style={{ width: app.overlay.pct }} /></div>}
           </div>
-
+          <div className={`stage-footer ${app.overlay.open ? 'transfer-status' : ''}`} title={app.overlay.open ? app.overlay.label : undefined}>
+            <span className="stage-orbit-dot" />
+            {app.overlay.open ? <><span className="stage-status-label">{app.overlay.label}</span>{app.overlay.pct && <span className="stage-status-pct">{app.overlay.pct}</span>}</> : queuedFiles.length ? `${queuedFiles.length} · ${t('app.choose_device')}` : selectedDevice ? `${t('app.text_panel_to')} ${selectedDevice.name || selectedEmoji}` : t('app.stage_prompt')}
+          </div>
+          {app.overlay.open && /\d+%/.test(app.overlay.pct) && <div className="stage-progress-track"><span style={{ width: app.overlay.pct }} /></div>}
         </section>
 
-        <div className="workspace-bottom">
-          <div className="hint-block">
-            <span className="hint-text">
-              {app.selectedId ? t('app.drag_or_tap') : t('app.choose_device')} <span className="hint-separator">·</span>{' '}
-              <button className="hint-text-link" onClick={tryOpenTextPanel}>{t('app.text_link')}</button>
-            </span>
-          </div>
-          <PillsRow
-          clips={app.clips}
-          onCopy={(text) =>
-            app.copyText(text).then((ok) => {
-              if (ok) app.showToast(t('toast.copied_clip'))
-            })
-          }
-          onDelete={app.removeClip}
-          />
-        </div>
+        <section className="card card-border elapp-shelf" aria-label={t('app.files_shelf')}>
+          <div className="shelf-heading"><div><span className="shelf-kicker">{t('app.stage_label')}</span><h2>{t('app.files_shelf')}</h2></div><div className="shelf-actions"><button className="shelf-text-action" onClick={tryOpenTextPanel}><TextIcon />{t('app.text_link')}</button><button className="shelf-add-action" onClick={tryOpenFilePicker}><PlusIcon />{t('app.add_files')}</button></div></div>
+          {queuedFiles.length ? <div className="queued-file-list">
+            {queuedFiles.map((file, index) => <div className="queued-file" key={`${file.name}-${file.size}-${index}`}><span className="queued-file-icon"><FileIcon /></span><span className="queued-file-details"><strong>{file.name}</strong><small>{formatSize(file.size)}</small></span><button className="queued-file-remove" aria-label={`${t('app.remove_file')}: ${file.name}`} title={t('app.remove_file')} onClick={() => setQueuedFiles((current) => current.filter((_, fileIndex) => fileIndex !== index))}>×</button></div>)}
+            {!selectedDevice && <p className="queue-instruction">{t('app.choose_device')}</p>}
+          </div> : <div className="queue-empty"><FileIcon /><span>{t('app.files_empty')}</span><button onClick={tryOpenFilePicker}>{t('app.add_files')}</button></div>}
+          {app.clips.length > 0 && <div className="clip-history"><span>{t('app.received')}</span><PillsRow clips={app.clips} onCopy={(text) => app.copyText(text).then((ok) => { if (ok) app.showToast(t('toast.copied_clip')) })} onDelete={app.removeClip} /></div>}
+        </section>
       </main>
 
       <footer>
@@ -188,6 +187,7 @@ export function InstantDropApp() {
           <Link href="/about">{t('footer.about')}</Link>
           <Link href="/help">{t('footer.help')}</Link>
           <Link href="/privacy">{t('footer.privacy')}</Link>
+          <Link href="/terms">Términos</Link>
           <a href="mailto:instantdropweb@gmail.com">{t('footer.contact')}</a>
         </nav>
       </footer>
@@ -212,8 +212,20 @@ export function InstantDropApp() {
   )
 }
 
-function LockIcon() {
-  return <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 1 1 8 0v3"/></svg>
+function TextIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M4 6V4h16v2M12 4v16m-4 0h8" /></svg>
+}
+
+function PlusIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 5v14M5 12h14" /></svg>
+}
+
+function FileIcon() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M7 3.5h7l4 4v13H7a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2Z" /><path d="M14 3.5v5h5M9 13h6M9 16.5h6" /></svg>
+}
+
+function SearchGlyph() {
+  return <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><circle cx="10.8" cy="10.8" r="5.8" /><path d="m15.2 15.2 4 4" /></svg>
 }
 
 function StageArtwork({ active, transferring }: { active: boolean; transferring: boolean }) {

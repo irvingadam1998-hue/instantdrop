@@ -1,10 +1,9 @@
 import type { MetadataRoute } from 'next'
-import { SITE_URL } from '@/lib/seo'
+import { IS_PRODUCTION, SITE_URL } from '@/lib/seo'
 
 export default function robots(): MetadataRoute.Robots {
-  const production = process.env.NODE_ENV === 'production'
   return {
-    rules: production
+    rules: IS_PRODUCTION
       ? { userAgent: '*', allow: '/', disallow: ['/api/'] }
       : { userAgent: '*', disallow: '/' },
     sitemap: new URL('/sitemap.xml', SITE_URL).toString(),

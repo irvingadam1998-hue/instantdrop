@@ -26,9 +26,11 @@ export function DropZone({
 
   return (
     <div className="drop-wrap">
-      <div
+      <button
+        type="button"
         id="drop-zone"
         className={`${dragOver ? 'drag-over' : ''} ${isDiscovering && !selectedEmoji ? 'discovering' : ''}`}
+        aria-label={selectedEmoji ? t('app.ready') : t('app.choose_device')}
         onDragOver={(e) => {
           e.preventDefault()
           setDragOver(true)
@@ -40,15 +42,21 @@ export function DropZone({
       <div className="diamond" />
       <div className="center-icon">
         {!selectedEmoji && isDiscovering && <div className="discovery-files" aria-hidden="true"><FileGlyph kind="image" /><FileGlyph kind="document" /><FileGlyph kind="audio" /></div>}
-        <div className={`icon-box ${isDiscovering && !selectedEmoji ? 'is-discovering' : ''}`} aria-hidden="true">{selectedEmoji || (isDiscovering ? <SearchIcon /> : <ArrowUp />)}</div>
-        <span className="icon-label">{selectedEmoji ? t('app.ready') : isDiscovering ? t('app.searching') : t('app.choose_device')}</span>
+        <span className={`icon-box ${isDiscovering && !selectedEmoji ? 'is-discovering' : ''}`} aria-hidden="true">
+          {selectedEmoji ? <span className="target-emoji">{selectedEmoji}</span> : isDiscovering ? <SearchIcon /> : <ArrowUp />}
+        </span>
+        <span className="icon-copy">
+          <span className="icon-label">{selectedEmoji ? t('app.ready') : isDiscovering ? t('app.searching') : t('app.choose_device')}</span>
+          <span className="icon-sublabel">{selectedEmoji ? t('app.selected') : t('app.add_files')}</span>
+        </span>
+        <span className="icon-chevron" aria-hidden="true">↗</span>
       </div>
     </div>
   )
 }
 
 function ArrowUp() {
-  return <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.55" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m7 10 5-5 5 5M12 5v14" /></svg>
+  return <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.65" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" /><path d="M5 14v5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-5" /></svg>
 }
 
 function SearchIcon() {

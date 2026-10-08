@@ -1,8 +1,9 @@
 import type { MetadataRoute } from 'next'
-import { SITE_URL } from '@/lib/seo'
+import { IS_PRODUCTION, SITE_URL } from '@/lib/seo'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  return ['', '/about', '/help', '/privacy'].map((path) => ({
+  if (!IS_PRODUCTION) return []
+  return ['', '/about', '/help', '/privacy', '/terms'].map((path) => ({
     url: new URL(path || '/', SITE_URL).toString(),
   }))
 }

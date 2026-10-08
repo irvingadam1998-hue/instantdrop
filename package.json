@@ -11,6 +11,9 @@
     "dev:server": "npm run dev -w @instantdrop/server",
     "dev:web": "npm run dev -w @instantdrop/web",
     "build": "npm run build -w @instantdrop/web",
+    "mobile:start": "npm run start -w instantdrop-mobile",
+    "mobile:android": "npm run android -w instantdrop-mobile",
+    "mobile:ios": "npm run ios -w instantdrop-mobile",
     "start": "npm run start -w @instantdrop/server",
     "start:web": "npm run start -w @instantdrop/web"
   },
