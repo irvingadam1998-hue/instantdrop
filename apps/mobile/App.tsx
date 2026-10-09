@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {Alert, Animated, Easing, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View} from 'react-native';
+import {Alert, Animated, Easing, Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, TextInput, View} from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {errorCodes, isErrorWithCode, keepLocalCopy, pick, type DocumentPickerResponse, type FileToCopy} from '@react-native-documents/picker';
 import EventSource from 'react-native-sse';
@@ -15,7 +15,7 @@ const ICE = {iceServers: [{urls: 'stun:stun.l.google.com:19302'}]};
 const MAX_FILE_SIZE = 500 * 1024 * 1024;
 const DATA_CHANNEL_HIGH_WATER = 4 * 1024 * 1024;
 const DATA_CHANNEL_LOW_WATER = 512 * 1024;
-const C = {bg: '#121512', panel: '#1b201c', card: '#202620', line: 'rgba(239,244,231,.1)', green: '#8ed9af', text: '#f1f1e9', muted: '#9ca59a', warm: '#f0bd87'};
+const C = {bg: '#fffdf6', panel: '#fffef9', card: '#eff6e8', line: '#dce5d1', green: '#35583c', lime: '#c7f235', text: '#1d3022', muted: '#667564', warm: '#c89068'};
 const randomHex = (bytes: number) => {
   const values = new Uint8Array(bytes);
   (globalThis as any).crypto.getRandomValues(values);
@@ -23,6 +23,9 @@ const randomHex = (bytes: number) => {
 };
 const base64ToBytes=(input:string)=>{const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';const clean=input.replace(/[^A-Za-z0-9+/]/g,'');const out=new Uint8Array(Math.floor(clean.length*3/4));let p=0;for(let i=0;i<clean.length;i+=4){const a=chars.indexOf(clean[i]),b=chars.indexOf(clean[i+1]),c=chars.indexOf(clean[i+2]),d=chars.indexOf(clean[i+3]);if(a<0||b<0)break;out[p++]=(a<<2)|(b>>4);if(c>=0)out[p++]=((b&15)<<4)|(c>>2);if(d>=0)out[p++]=((c&3)<<6)|d;}return out.subarray(0,p);};
 const bytesToBase64=(bytes:Uint8Array)=>{const chars='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';let result='';for(let i=0;i<bytes.length;i+=3){const a=bytes[i],hasB=i+1<bytes.length,hasC=i+2<bytes.length,b=hasB?bytes[i+1]:0,c=hasC?bytes[i+2]:0;result+=chars[a>>2]+chars[((a&3)<<4)|(b>>4)]+(hasB?chars[((b&15)<<2)|(c>>6)]:'=')+(hasC?chars[c&63]:'=');}return result;};
+const toArrayBuffer=(bytes:Uint8Array)=>bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer;
+const toBytes=(value:any):Uint8Array|null=>{if(value instanceof ArrayBuffer)return new Uint8Array(value);if(ArrayBuffer.isView(value))return new Uint8Array(value.buffer,value.byteOffset,value.byteLength);return null;};
+const filePath=(uri:string)=>uri.replace(/^file:\/\//,'');
 
 function App() {
   const [server, setServer] = useState(DEFAULT_SERVER);
@@ -40,7 +43,6 @@ function App() {
   const [connected, setConnected] = useState(false);
   const [busy, setBusy] = useState(false);
   const [toast, setToast] = useState('');
-  const [roomEditor, setRoomEditor] = useState(false);
   const [serverEditor, setServerEditor] = useState(false);
   const source = useRef<EventSource<'devices' | 'ping'> | null>(null);
   const peersRef = useRef<Peer[]>([]);
@@ -52,7 +54,6 @@ function App() {
   const scan = useRef(new Animated.Value(0)).current;
   const orbit = useRef(new Animated.Value(0)).current;
 
-  const api = useCallback((path:string) => `${server.replace(/\/$/,'')}${path}`, [server]);
   const notify = useCallback((message:string) => {setToast(message); setTimeout(()=>setToast(''),2800);},[]);
   const updatePeers = useCallback((list:Peer[]) => {
     const unique = [...new Map(list.filter(p=>p.id && p.id!==myId).map(p=>[p.id,p])).values()];
@@ -73,8 +74,8 @@ function App() {
       const response=await fetch(`${base}/api/register`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({deviceId,token:credential,roomId:activeRoom||undefined,name:Platform.OS==='ios'?'iPhone':'Android'})});
       if(!response.ok) throw new Error('No se pudo registrar el teléfono');
       const info=await response.json();
-      setMyId(info.deviceId);setToken(info.token);setMyEmoji(info.emoji);setRoom(activeRoom);setSession(sid);
-      await AsyncStorage.setItem(STORAGE,JSON.stringify({deviceId:info.deviceId,token:info.token,roomId:activeRoom,server:base,session:sid,emoji:info.emoji}));
+      setMyId(info.deviceId);setToken(info.token);setMyEmoji(info.emoji);setRoom('');setSession(sid);
+      await AsyncStorage.setItem(STORAGE,JSON.stringify({deviceId:info.deviceId,token:info.token,roomId:'',server:base,session:sid,emoji:info.emoji}));
       source.current?.close();
       const params=new URLSearchParams({deviceId:info.deviceId,token:info.token,sessionId:sid});if(activeRoom)params.set('roomId',activeRoom);
       const es=new EventSource<'devices'|'ping'>(`${base}/api/events?${params.toString()}`);source.current=es;
@@ -108,7 +109,7 @@ function App() {
 
   const bindIncoming=useCallback((channel:any,peerId:string)=>{
     let incomingName='',destination='',expected=1,doneCount=0;let writeQueue=Promise.resolve();channel.binaryType='arraybuffer';
-    channel.onmessage=(event:any)=>{if(typeof event.data!=='string') {const chunk=event.data instanceof ArrayBuffer?new Uint8Array(event.data):new Uint8Array(event.data.buffer,event.data.byteOffset,event.data.byteLength);writeQueue=writeQueue.then(()=>RNFS.appendFile(destination,bytesToBase64(chunk))).catch(()=>notify('No se pudo guardar el archivo recibido'));return;}
+    channel.onmessage=(event:any)=>{const chunk=toBytes(event.data);if(chunk){if(!destination){notify('Llegó un archivo sin información válida');return;}writeQueue=writeQueue.then(()=>RNFS.appendFile(destination,bytesToBase64(chunk))).catch(()=>notify('No se pudo guardar el archivo recibido'));return;}
       try{const msg=JSON.parse(event.data);if(msg.type==='request'){expected=Math.max(1,msg.files?.length||1);const summary=(msg.files||[]).map((f:any)=>`${f.name} · ${formatBytes(f.size||0)}`).join('\n');Alert.alert('Transferencia entrante',summary||'Otro dispositivo quiere compartir archivos contigo.',[{text:'Rechazar',style:'cancel',onPress:()=>{channel.send(JSON.stringify({type:'reject'}));channel.close();}},{text:'Aceptar',onPress:()=>{channel.send(JSON.stringify({type:'accept'}));notify(`Recibiendo ${expected} archivo(s)…`);}}]);}
         else if(msg.type==='meta'){incomingName=String(msg.name||'archivo').replace(/[\\/:*?"<>|]/g,'_');destination=`${RNFS.DocumentDirectoryPath}/${Date.now()}-${incomingName}`;writeQueue=RNFS.writeFile(destination,'','base64');}
         else if(msg.type==='done'){void writeQueue.then(()=>{doneCount++;if(doneCount>=expected){notify(`Recibido: ${incomingName} · ${destination}`);setBusy(false);channel.close();pcs.current.get(peerId)?.close();pcs.current.delete(peerId);}});}
@@ -127,7 +128,7 @@ function App() {
         if(channel.bufferedAmount<=DATA_CHANNEL_LOW_WATER)onLow();
       });
     };
-    try{channel.bufferedAmountLowThreshold=DATA_CHANNEL_LOW_WATER;for(const file of list){const path=file.fileCopyUri||file.uri;const size=file.size||0;if(!path)throw new Error('No se encontró la copia local del archivo');channel.send(JSON.stringify({type:'meta',name:file.name||'archivo',size}));let offset=0;while(offset<size){await waitForChannelSpace();const length=Math.min(48*1024,size-offset);const b64=await RNFS.read(path,length,offset,'base64');const bytes=base64ToBytes(b64);if(bytes.byteLength===0)throw new Error('No se pudo leer el archivo');channel.send(bytes);offset+=bytes.byteLength;}channel.send(JSON.stringify({type:'done'}));}notify('Transferencia enviada');setBusy(false);setFiles([]);channel.close();pcs.current.get(target)?.close();pcs.current.delete(target);}catch(e:any){setBusy(false);notify(e?.message||'Falló la lectura del archivo');channel.close();pcs.current.get(target)?.close();pcs.current.delete(target);}
+    try{channel.bufferedAmountLowThreshold=DATA_CHANNEL_LOW_WATER;for(const file of list){const uri=file.fileCopyUri||file.uri;const size=file.size||0;if(!uri)throw new Error('No se encontró la copia local del archivo');const path=filePath(uri);channel.send(JSON.stringify({type:'meta',name:file.name||'archivo',size}));let offset=0;while(offset<size){await waitForChannelSpace();const length=Math.min(48*1024,size-offset);const b64=await RNFS.read(path,length,offset,'base64');const bytes=base64ToBytes(b64);if(bytes.byteLength===0)throw new Error('No se pudo leer el archivo');channel.send(toArrayBuffer(bytes));offset+=bytes.byteLength;}channel.send(JSON.stringify({type:'done'}));}notify('Transferencia enviada');setBusy(false);setFiles([]);channel.close();pcs.current.get(target)?.close();pcs.current.delete(target);}catch(e:any){setBusy(false);notify(e?.message||'Falló la lectura del archivo');channel.close();pcs.current.get(target)?.close();pcs.current.delete(target);}
   },[notify]);
 
   const sendFiles=useCallback(async(target:string,list:FileItem[])=>{
@@ -137,7 +138,10 @@ function App() {
       pc.onicecandidate=(e:any)=>{if(e.candidate)void signal(server,target,myId,token,session,room,'ice',e.candidate.toJSON());};
       channel.onopen=()=>{channel.send(JSON.stringify({type:'request',files:list.map(f=>({name:f.name||'archivo',size:f.size||0}))}));notify('Esperando confirmación del dispositivo…');};
       channel.onmessage=(e:any)=>{try{const m=JSON.parse(e.data);if(m.type==='accept')void transferFiles(target,channel,list);else if(m.type==='reject'){setBusy(false);notify('El dispositivo rechazó la transferencia');}}catch{}};
-      const offer=await pc.createOffer();await pc.setLocalDescription(offer);await signal(server,target,myId,token,session,room,'offer',pc.localDescription);
+      channel.onerror=()=>{setBusy(false);notify('La conexión de transferencia se interrumpió');pcs.current.get(target)?.close();pcs.current.delete(target);};
+      // InstantDrop uses a data channel only.  Avoid requesting audio/video
+      // m-lines: some Android WebRTC builds abort natively while creating them.
+      const offer=await pc.createOffer({offerToReceiveAudio:false,offerToReceiveVideo:false});await pc.setLocalDescription(offer);await signal(server,target,myId,token,session,room,'offer',pc.localDescription);
       notify(`${list.length} archivo(s) listos para enviar`);
     }catch(e:any){setBusy(false);notify(e?.message||'No se pudo iniciar el envío');}
   },[myId,token,session,server,room,signal,notify,transferFiles]);
@@ -148,11 +152,11 @@ function App() {
       pc.onicecandidate=(e:any)=>{if(e.candidate)void signal(server,target,myId,token,session,room,'ice',e.candidate.toJSON());};
       channel.onopen=()=>{channel.send(JSON.stringify({type:'text',content}));};
       channel.onmessage=(e:any)=>{try{if(JSON.parse(e.data).type==='text-ack'){setBusy(false);setSharedText('');notify('Texto enviado');channel.close();pc.close();pcs.current.delete(target);}}catch{}};
-      const offer=await pc.createOffer();await pc.setLocalDescription(offer);await signal(server,target,myId,token,session,room,'offer',pc.localDescription);
+      const offer=await pc.createOffer({offerToReceiveAudio:false,offerToReceiveVideo:false});await pc.setLocalDescription(offer);await signal(server,target,myId,token,session,room,'offer',pc.localDescription);
     }catch(e:any){setBusy(false);notify(e?.message||'No se pudo enviar el texto');}
   },[sharedText,selected,myId,token,session,server,room,signal,notify]);
 
-  useEffect(()=>{void (async()=>{try{const raw=await AsyncStorage.getItem(STORAGE);const saved=raw?JSON.parse(raw):{};const configuredServer=typeof saved.server==='string'&&saved.server.trim()?saved.server.trim():DEFAULT_SERVER;if(saved.session)setSession(saved.session);if(saved.emoji)setMyEmoji(saved.emoji);if(saved.roomId)setRoom(saved.roomId);setServer(configuredServer);setServerDraft(configuredServer);if(saved.deviceId)setMyId(saved.deviceId);if(saved.token)setToken(saved.token);await connect({...saved,server:configuredServer});}catch{setStatus('No se pudo conectar al servidor');}})();
+  useEffect(()=>{void (async()=>{try{const raw=await AsyncStorage.getItem(STORAGE);const saved=raw?JSON.parse(raw):{};const configuredServer=typeof saved.server==='string'&&saved.server.trim()?saved.server.trim():DEFAULT_SERVER;if(saved.session)setSession(saved.session);if(saved.emoji)setMyEmoji(saved.emoji);setRoom('');setServer(configuredServer);setServerDraft(configuredServer);if(saved.deviceId)setMyId(saved.deviceId);if(saved.token)setToken(saved.token);await connect({...saved,roomId:'',server:configuredServer});}catch{setStatus('No se pudo conectar al servidor');}})();
     const animation=Animated.loop(Animated.timing(scan,{toValue:1,duration:2600,easing:Easing.linear,useNativeDriver:true}));animation.start();const orbitAnimation=Animated.loop(Animated.timing(orbit,{toValue:1,duration:22000,easing:Easing.linear,useNativeDriver:true}));orbitAnimation.start();return()=>{animation.stop();orbitAnimation.stop();source.current?.close();pcs.current.forEach((pc:any)=>pc.close());};
   // connect reads the persisted identity once when the app starts.
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -160,14 +164,12 @@ function App() {
 
   const selectedPeer=useMemo(()=>peers.find(p=>p.id===selected),[peers,selected]);
   const pickFiles=async()=>{try{const picked=await pick({allowMultiSelection:true,mode:'import'});if(!picked.length)return;if(picked.some(file=>(file.size||0)>MAX_FILE_SIZE)){notify('Cada archivo debe pesar menos de 500 MB');return;}const filesToCopy=picked.map(file=>({uri:file.uri,fileName:file.name||'archivo'})) as [FileToCopy,...FileToCopy[]];const local=await keepLocalCopy({files:filesToCopy,destination:'cachesDirectory'});const list=picked.map((file,index)=>({...file,fileCopyUri:local[index]?.status==='success'?local[index].localUri:undefined}));if(list.some(file=>!file.fileCopyUri)){notify('No se pudo preparar uno de los archivos');return;}setFiles(prev=>[...prev,...list]);if(selected)void sendFiles(selected,list);}catch(e){if(!isErrorWithCode(e)||e.code!==errorCodes.OPERATION_CANCELED)notify('No se pudieron abrir los archivos');}};
-  const changeRoom=async()=>{const normalized=room.trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'').slice(0,24);setRoom(normalized);setRoomEditor(false);source.current?.close();await AsyncStorage.setItem(STORAGE,JSON.stringify({deviceId:myId,token,roomId:normalized,server,session,emoji:myEmoji}));void connect({deviceId:myId,token,roomId:normalized,server});};
   const rotation=orbit.interpolate({inputRange:[0,1],outputRange:['0deg','360deg']});
   const sweepRotation=scan.interpolate({inputRange:[0,1],outputRange:['-35deg','325deg']});
 
-  return <SafeAreaProvider><SafeAreaView style={s.safe}><StatusBar barStyle="light-content"/><KeyboardAvoidingView style={s.flex} behavior={Platform.OS==='ios'?'padding':undefined}>
-    <View style={s.header}><View style={s.brand}><View style={s.brandMark}><Text style={s.brandArrow}>↗</Text></View><Text style={s.brandName}>instantdrop</Text></View><View style={s.headerActions}><Pressable onPress={()=>setServerEditor(v=>!v)} style={s.settingsButton}><Text style={s.settingsText}>⚙</Text></Pressable><Pressable onPress={()=>setRoomEditor(v=>!v)} style={s.roomPill}><Text style={s.roomLabel}>SALA</Text><Text style={s.roomCode}>{room||'AUTO'}</Text></Pressable><Pressable onPress={pickFiles} style={s.addButton}><Text style={s.addText}>＋</Text></Pressable></View></View>
+  return <SafeAreaProvider><SafeAreaView style={s.safe}><StatusBar barStyle="dark-content"/><KeyboardAvoidingView style={s.flex} behavior={Platform.OS==='ios'?'padding':undefined}>
+    <View style={s.header}><View style={s.brand}><Image source={require('./src/assets/instantdrop-logo.png')} style={{width:44,height:44}}/><Text style={s.brandName}>instant<Text style={{color:'#63765e',fontWeight:'400'}}>drop</Text></Text></View><View style={s.headerActions}><Pressable onPress={()=>setServerEditor(v=>!v)} style={s.settingsButton}><Text style={s.settingsText}>⚙</Text></Pressable><Pressable onPress={pickFiles} style={s.addButton}><Text style={s.addText}>＋</Text></Pressable></View></View>
     {serverEditor&&<View style={s.roomEdit}><Text style={s.roomHelp}>Backend configurado: {DEFAULT_SERVER}. Puedes cambiarlo aquí.</Text><TextInput value={serverDraft} onChangeText={setServerDraft} placeholder={DEFAULT_SERVER} placeholderTextColor={C.muted} autoCapitalize="none" keyboardType="url" style={s.roomInput}/><Pressable onPress={async()=>{const base=serverDraft.trim().replace(/\/$/,'');setServer(base);await AsyncStorage.setItem(STORAGE,JSON.stringify({deviceId:myId,token,roomId:room,server:base,session,emoji:myEmoji}));setServerEditor(false);void connect({deviceId:myId,token,roomId:room,server:base});}} style={s.roomSave}><Text style={s.roomSaveText}>Conectar</Text></Pressable></View>}
-    {roomEditor&&<View style={s.roomEdit}><Text style={s.roomHelp}>Usa el mismo código en los dispositivos que compartirán archivos.</Text><TextInput value={room} onChangeText={setRoom} placeholder="CÓDIGO DE SALA" placeholderTextColor={C.muted} autoCapitalize="characters" style={s.roomInput}/><Pressable onPress={changeRoom} style={s.roomSave}><Text style={s.roomSaveText}>Unirse</Text></Pressable></View>}
     <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
       <View style={s.eyebrow}><View style={[s.liveDot,{backgroundColor:connected?C.green:C.warm}]}/><Text style={s.eyebrowText}>TU ESPACIO DE INTERCAMBIO</Text></View>
       <Text style={s.title}>Comparte al instante.</Text><Text style={s.subtitle}>Archivos directo entre tus dispositivos, sin nube.</Text>
